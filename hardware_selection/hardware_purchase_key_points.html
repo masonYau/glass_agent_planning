@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>全天候记忆眼镜硬件采购关键点</title>
+  <style>
+    :root {
+      --bg: #f4f6f3;
+      --paper: #fffefa;
+      --ink: #18201d;
+      --muted: #63706a;
+      --line: #d8ded5;
+      --soft: #eef2ec;
+      --teal: #0d6b63;
+      --green: #2f704c;
+      --brick: #a64d32;
+      --gold: #ad7715;
+      --indigo: #405a91;
+      --radius: 8px;
+      --shadow: 0 16px 38px rgba(25, 34, 30, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(13, 107, 99, 0.09), transparent 310px),
+        var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.68;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--teal);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 22px 62px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+    }
+
+    .brand-mark {
+      position: relative;
+      width: 34px;
+      height: 20px;
+      border: 3px solid var(--teal);
+      border-radius: 999px;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      top: 5px;
+      width: 14px;
+      height: 3px;
+      background: var(--teal);
+      border-radius: 999px;
+    }
+
+    .brand-mark::before {
+      left: -18px;
+      transform: rotate(10deg);
+    }
+
+    .brand-mark::after {
+      right: -18px;
+      transform: rotate(-10deg);
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 254, 250, 0.80);
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 0.48fr);
+      gap: 30px;
+      align-items: stretch;
+      padding: 42px 0 36px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 13px;
+      color: var(--teal);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .kicker::before {
+      content: "";
+      width: 26px;
+      height: 2px;
+      background: var(--teal);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 840px;
+      margin-bottom: 16px;
+      font-size: 44px;
+      line-height: 1.14;
+    }
+
+    .lead {
+      max-width: 800px;
+      margin-bottom: 22px;
+      color: #34403a;
+      font-size: 18px;
+      line-height: 1.78;
+    }
+
+    .decision {
+      display: grid;
+      gap: 10px;
+      max-width: 790px;
+    }
+
+    .decision-row {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-height: 52px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 254, 250, 0.78);
+    }
+
+    .decision-row strong {
+      color: var(--teal);
+      font-size: 14px;
+    }
+
+    .decision-row span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .hero-card {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      min-height: 330px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 84% 16%, rgba(173, 119, 21, 0.18), transparent 28%),
+        linear-gradient(145deg, #fffefa, #edf4ef);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card h2 {
+      margin-bottom: 0;
+      font-size: 20px;
+      line-height: 1.35;
+    }
+
+    .ranking {
+      display: grid;
+      gap: 10px;
+    }
+
+    .rank {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(24, 32, 29, 0.12);
+      border-radius: var(--radius);
+      background: rgba(255, 254, 250, 0.78);
+    }
+
+    .rank b {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--teal);
+    }
+
+    .rank:nth-child(2) b {
+      background: var(--indigo);
+    }
+
+    .rank:nth-child(3) b {
+      background: var(--gold);
+    }
+
+    .rank strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 15px;
+    }
+
+    .rank span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    section {
+      padding: 42px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    section:last-of-type {
+      border-bottom: none;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.34fr) minmax(0, 0.66fr);
+      gap: 26px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    h2 {
+      margin-bottom: 7px;
+      font-size: 28px;
+      line-height: 1.26;
+    }
+
+    h3 {
+      margin-bottom: 8px;
+      font-size: 18px;
+      line-height: 1.36;
+    }
+
+    .section-head p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .scenario {
+      min-height: 232px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: 0 10px 24px rgba(25, 34, 30, 0.05);
+    }
+
+    .scenario .label {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      margin-bottom: 12px;
+      border-radius: 999px;
+      color: var(--paper);
+      background: var(--teal);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .scenario:nth-child(2) .label {
+      background: var(--brick);
+    }
+
+    .scenario:nth-child(3) .label {
+      background: var(--indigo);
+    }
+
+    .scenario:nth-child(4) .label {
+      background: var(--gold);
+    }
+
+    .scenario p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .criteria-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .criterion {
+      min-height: 180px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .criterion b {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 34px;
+      height: 34px;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--green);
+      font-size: 14px;
+    }
+
+    .criterion:nth-child(2) b,
+    .criterion:nth-child(5) b {
+      background: var(--indigo);
+    }
+
+    .criterion:nth-child(3) b,
+    .criterion:nth-child(6) b {
+      background: var(--brick);
+    }
+
+    .criterion p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .band {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: 0 10px 25px rgba(25, 34, 30, 0.05);
+    }
+
+    .device-table,
+    .check-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .device-table th,
+    .device-table td,
+    .check-table th,
+    .check-table td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .device-table th,
+    .check-table th {
+      background: #e8ede5;
+      color: #35413b;
+      font-size: 13px;
+    }
+
+    .device-table tr:last-child td,
+    .check-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .device-table td:first-child,
+    .check-table td:first-child {
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 25px;
+      padding: 3px 8px;
+      margin: 2px 4px 2px 0;
+      border-radius: 999px;
+      border: 1px solid rgba(13, 107, 99, 0.30);
+      color: var(--teal);
+      background: rgba(13, 107, 99, 0.08);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .tag.warn {
+      color: var(--brick);
+      border-color: rgba(166, 77, 50, 0.32);
+      background: rgba(166, 77, 50, 0.08);
+    }
+
+    .tag.neutral {
+      color: #535f5a;
+      border-color: rgba(83, 95, 90, 0.30);
+      background: rgba(83, 95, 90, 0.08);
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .note-box {
+      min-height: 210px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+    }
+
+    .note-box p,
+    .note-box li {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    ul,
+    ol {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin: 7px 0;
+    }
+
+    .strategy {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .strategy-card {
+      min-height: 205px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .strategy-card.recommended {
+      border-color: rgba(13, 107, 99, 0.45);
+      box-shadow: 0 14px 28px rgba(13, 107, 99, 0.12);
+    }
+
+    .strategy-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .source-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .footnote {
+      margin: 22px 0 0;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .section-head,
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .scenario-grid,
+      .criteria-grid,
+      .strategy {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        padding: 18px 14px 46px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .lead {
+        font-size: 16px;
+      }
+
+      .decision-row,
+      .scenario-grid,
+      .criteria-grid,
+      .strategy,
+      .source-list {
+        grid-template-columns: 1fr;
+      }
+
+      .device-table,
+      .check-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>全天候记忆眼镜采购说明</span>
+      </div>
+      <nav class="nav" aria-label="页面导航">
+        <a href="#scenes">使用场景</a>
+        <a href="#criteria">采购指标</a>
+        <a href="#devices">设备对比</a>
+        <a href="#decision">采购建议</a>
+        <a href="#validation">验证清单</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <div class="kicker">基于当前硬件选型对话整理，更新于 2026-08-17</div>
+          <h1>采购智能眼镜时，先按“生活全天候记忆”而不是“AR 显示设备”来判断</h1>
+          <p class="lead">
+            当前产品目标是让眼镜持续陪伴用户，在生活和工作中自动识别关键时段，
+            将音频、低频图片、短视频和场景摘要转换为可检索记忆，再通过手机端或眼镜端与云端智能体对话。
+            因此采购重点不是屏幕效果，而是全天候佩戴、低功耗采集、低光画质、音频质量、开放 SDK、手机中继和国内测试兼容性。
+          </p>
+          <div class="decision" aria-label="核心采购判断">
+            <div class="decision-row">
+              <strong>产品形态</strong>
+              <span>个人生活与工作记忆层，核心是采集和召回，不是 3D AR 娱乐。</span>
+            </div>
+            <div class="decision-row">
+              <strong>采集策略</strong>
+              <span>音频常驻低功耗，视觉低频记录，关键场景升频，视频只保留短段证据。</span>
+            </div>
+            <div class="decision-row">
+              <strong>采购结论</strong>
+              <span>外网稳定时 Mentra Live 更适合全天候记忆主线；国内快速 MVP 和 HUD 交互仍建议保留 Rokid 乐奇；小米主要作为消费化参考。</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="hero-card">
+          <h2>当前三款设备的角色分工</h2>
+          <div class="ranking">
+            <div class="rank">
+              <b>1</b>
+              <div>
+                <strong>Mentra Live</strong>
+                <span>更像全天候记忆传感器。开放 SDK、无显示、轻量，适合验证低功耗持续采集。</span>
+              </div>
+            </div>
+            <div class="rank">
+              <b>2</b>
+              <div>
+                <strong>Rokid 乐奇 / Glass3</strong>
+                <span>更适合国内 MVP、手机中继、HUD 反馈和企业开发套件验证。</span>
+              </div>
+            </div>
+            <div class="rank">
+              <b>3</b>
+              <div>
+                <strong>小米 AI 眼镜</strong>
+                <span>硬件和国内消费体验有参考价值，但公开开发接口不足，不建议作为首版主硬件。</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="scenes">
+        <div class="section-head">
+          <div>
+            <h2>使用场景</h2>
+            <p>硬件采购必须从场景倒推，而不是先被参数表吸走注意力。</p>
+          </div>
+          <p>
+            这个产品最有价值的能力，是在用户没有主动记录的情况下捕捉生活与工作中的关键信息。
+            下面四类场景决定了眼镜需要什么硬件能力，以及哪些参数必须在采购前实测。
+          </p>
+        </div>
+
+        <div class="scenario-grid">
+          <article class="scenario">
+            <span class="label">就医与用药</span>
+            <h3>“几日前医生告诉我的用药方法是什么？”</h3>
+            <p>
+              重点依赖清晰录音、中文 ASR、时间戳、说话人区分和诊室弱光环境下的关键帧。
+              采购时要验证麦克风阵列、噪声抑制、低光拍照和长段音频回传。
+            </p>
+          </article>
+
+          <article class="scenario">
+            <span class="label">物品遗失</span>
+            <h3>“耳机可能在哪里丢失？”</h3>
+            <p>
+              重点依赖低频视觉快照、通勤路径、室内外光照变化、物体识别和时间线回放。
+              眼镜不需要全天录像，但要能稳定低功耗拍图并在关键变化时升频。
+            </p>
+          </article>
+
+          <article class="scenario">
+            <span class="label">会议细节</span>
+            <h3>“几天前会议里提到的具体数字是多少？”</h3>
+            <p>
+              重点依赖自动识别会议开始、持续录音、屏幕或白板关键帧、转写文本和证据片段。
+              采购时要压测后台录音、热量、续航和手机锁屏后的稳定性。
+            </p>
+          </article>
+
+          <article class="scenario">
+            <span class="label">通勤居家</span>
+            <h3>“闲暇时段也要有轻度记忆，但不能打扰用户。”</h3>
+            <p>
+              重点是舒适佩戴、低功耗常驻、隐私开关、敏感场景自动降采样。
+              这类场景决定硬件不能长期高功耗录像，也不能过重或过热。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="criteria">
+        <div class="section-head">
+          <div>
+            <h2>采购指标</h2>
+            <p>每个指标都应服务于“全天候记忆”，而不是单次炫技演示。</p>
+          </div>
+          <p>
+            下面是采购前需要明确的关键指标。它们共同决定设备能否从 demo 走向真实日常使用：
+            用户愿不愿意戴，数据能不能采回来，记忆能不能被准确召回。
+          </p>
+        </div>
+
+        <div class="criteria-grid">
+          <article class="criterion">
+            <b>01</b>
+            <h3>全天候佩戴</h3>
+            <p>优先看 40-50g 区间、夹头感、鼻托、发热和充电盒。2 小时舒适不等于全天可用，必须做半天佩戴测试。</p>
+          </article>
+
+          <article class="criterion">
+            <b>02</b>
+            <h3>低功耗采集</h3>
+            <p>采购时不要假设能全天录像。理想模式是音频/VAD 常驻、图片低频、事件升频、短视频证据化保存。</p>
+          </article>
+
+          <article class="criterion">
+            <b>03</b>
+            <h3>低光图像</h3>
+            <p>诊室、餐厅、电梯、夜间通勤都属于关键场景。需要关注传感器、光圈、HDR、夜景算法和开发者能否控制曝光。</p>
+          </article>
+
+          <article class="criterion">
+            <b>04</b>
+            <h3>音频与转写</h3>
+            <p>会议、就医和对话召回主要靠音频。要确认麦克风数量、原始音频流、降噪、回声消除和后台录音权限。</p>
+          </article>
+
+          <article class="criterion">
+            <b>05</b>
+            <h3>开发套件开放度</h3>
+            <p>必须能由自开发手机 App 控制拍照、录像、录音、文件同步、视频流、按键触发和云端上传。</p>
+          </article>
+
+          <article class="criterion">
+            <b>06</b>
+            <h3>国内兼容性</h3>
+            <p>看采购、售后、文档、账号、App 安装、SDK 包、网络访问、云服务接入和 Android 后台权限是否能在中国顺畅测试。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="devices">
+        <div class="section-head">
+          <div>
+            <h2>设备对比</h2>
+            <p>乐奇、小米、Mentra Live 的价值不在同一条线上。</p>
+          </div>
+          <p>
+            如果稳定连接外网，Mentra Live 在全天候记忆主线上的吸引力会上升；
+            但中国国内开发、低光确定性和眼镜端 HUD 交互仍让 Rokid 乐奇保有明显价值。
+          </p>
+        </div>
+
+        <table class="device-table" aria-label="三款眼镜对比表">
+          <thead>
+            <tr>
+              <th>维度</th>
+              <th>Rokid 乐奇 / Glass3</th>
+              <th>小米 AI 眼镜</th>
+              <th>Mentra Live</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>当前定位</td>
+              <td><span class="tag">国内 MVP 与 HUD 交互</span> 适合验证手机中继、眼镜端显示、国内云和企业开发套件。</td>
+              <td><span class="tag neutral">消费形态参考</span> 轻量、国内易买，但公开开发接口不够确定。</td>
+              <td><span class="tag">全天候记忆采集</span> 更像开放的生活记录传感器，适合验证持续采集架构。</td>
+            </tr>
+            <tr>
+              <td>佩戴与续航</td>
+              <td>约 49g，带显示和相机；电池容量较小，适合事件触发和短片段采集，不应假设全天录像。</td>
+              <td>约 40g，消费级佩戴体验好，官方续航口径较强，但开发者后台采集能力未知。</td>
+              <td>约 43g，无显示，眼镜电池配充电盒；若外网稳定，更适合低功耗全天候记录验证。</td>
+            </tr>
+            <tr>
+              <td>低光图像</td>
+              <td>12MP Sony IMX681，官方资料提到 HDR、降噪、稳定等能力；低光确定性相对更好，但仍需夜间实拍。</td>
+              <td>12MP Sony IMX681，硬件与影像调校有潜力；但能否在第三方 App 中控制夜景/HDR 不明确。</td>
+              <td>开放性强，但官方未充分公开传感器、光圈、HDR/夜景算法；低光必须作为首轮实测重点。</td>
+            </tr>
+            <tr>
+              <td>音频与对话</td>
+              <td>4 麦阵列，适合语音助手、ASR/TTS 和 HUD 反馈。</td>
+              <td>5 麦阵列，消费体验有优势；原始音频和第三方后台录音接口需确认。</td>
+              <td>3 麦，SDK 开放度高，适合自开发手机 App 持续采集和云端转写。</td>
+            </tr>
+            <tr>
+              <td>开发套件</td>
+              <td>Glass3 SDK 支持手机连接、P2P、媒体采集、实时预览、文件传输和眼镜端开发；企业版权限需申请。</td>
+              <td><span class="tag warn">最大不确定项</span> 未看到完整公开的 AI 眼镜第三方 SDK，不能作为首版主开发设备。</td>
+              <td>开源 SDK 更适合自开发 Android/iOS App 控制相机、麦克风、按钮、触控和上传链路。</td>
+            </tr>
+            <tr>
+              <td>国内开发测试</td>
+              <td><span class="tag">最稳</span> 中文文档、国内购买/售后/商务相对明确，适合快速联调。</td>
+              <td><span class="tag">购买最稳</span> 国内消费渠道好，但开发权限不稳。</td>
+              <td><span class="tag warn">取决于外网</span> 外网、GitHub/npm、App、云服务和售后都要提前验证。</td>
+            </tr>
+            <tr>
+              <td>主要风险</td>
+              <td>消费版可能缺企业账号、企业 API Key、企业 Demo、长期后台能力和完整 SDK 授权。</td>
+              <td>硬件好但开发封闭，可能只能做体验参考，不能控制采集链路。</td>
+              <td>国内采购与售后、低光画质、无 HUD 交互、长期量产供货都需要验证。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="decision">
+        <div class="section-head">
+          <div>
+            <h2>采购建议</h2>
+            <p>建议避免单点押注，用两条硬件线降低风险。</p>
+          </div>
+          <p>
+            对这个产品来说，硬件采购不是一次性选“最好的一副眼镜”，而是选择最能验证核心假设的组合。
+            采购组合应覆盖全天候记录、国内落地、低光画质和未来消费化形态。
+          </p>
+        </div>
+
+        <div class="strategy">
+          <article class="strategy-card recommended">
+            <span class="tag">主线 A</span>
+            <h3>Mentra Live：全天候记忆采集验证</h3>
+            <p>
+              在外网稳定的前提下，优先用 Mentra Live 验证低功耗常驻、低频图片、音频采集、手机上传和自有云 RAG。
+              它更接近“生活记忆传感器”。
+            </p>
+          </article>
+
+          <article class="strategy-card recommended">
+            <span class="tag">主线 B</span>
+            <h3>Rokid 乐奇：国内 MVP 与 HUD 验证</h3>
+            <p>
+              采购或申请 Rokid Glass3 Enterprise / Sprite Enterprise，用来验证国内 SDK、手机中继、眼镜端交互、低光图像和企业场景 demo。
+            </p>
+          </article>
+
+          <article class="strategy-card">
+            <span class="tag neutral">参考线</span>
+            <h3>小米 AI 眼镜：消费化形态参考</h3>
+            <p>
+              可以买 1 台观察轻量化、低光拍摄、佩戴和用户心智。但在公开 SDK 不明确前，不建议作为核心开发硬件。
+            </p>
+          </article>
+        </div>
+
+        <div class="two-col" style="margin-top: 18px;">
+          <div class="note-box">
+            <h3>第一批建议采购</h3>
+            <ul>
+              <li>Mentra Live 1 台：验证全天候采集和开放 SDK。</li>
+              <li>Rokid 乐奇 / Glass3 1-2 台：验证国内开发、HUD、低光和手机中继。</li>
+              <li>小米 AI 眼镜 1 台：作为消费级体验和低光参考，暂不进入主开发链路。</li>
+            </ul>
+          </div>
+
+          <div class="note-box">
+            <h3>不要用连续录像定义产品</h3>
+            <ul>
+              <li>平时只做音频/VAD、低频图像、位置和时间线。</li>
+              <li>检测到就医、会议、购物、通勤异常等关键场景后升频采集。</li>
+              <li>视频只保留 30 秒到数分钟证据片段，文本和关键帧进入长期记忆。</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="validation">
+        <div class="section-head">
+          <div>
+            <h2>验证清单</h2>
+            <p>采购前后都要用同一套测试跑一遍。</p>
+          </div>
+          <p>
+            下面这张表可以直接作为样机验收清单。只有通过这些测试，设备才算适合进入全天候记忆产品的下一阶段。
+          </p>
+        </div>
+
+        <table class="check-table" aria-label="硬件验证清单">
+          <thead>
+            <tr>
+              <th>验证项</th>
+              <th>测试方式</th>
+              <th>通过标准</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>低光图像</td>
+              <td>在诊室、餐厅、电梯、夜间路边、家中弱光各拍 30 组图片和 5 段短视频。</td>
+              <td>能看清物品、纸面文字、屏幕数字和人物动作；模型能生成可用视觉摘要。</td>
+            </tr>
+            <tr>
+              <td>会议录音</td>
+              <td>连续录制 60-120 分钟多人会议，手机锁屏、App 后台、弱网各测试一次。</td>
+              <td>无明显丢段；ASR 可定位关键数字、事项、时间和说话人线索。</td>
+            </tr>
+            <tr>
+              <td>低频视觉记录</td>
+              <td>设置 10-30 秒一张图片，模拟通勤、居家、办公室半天使用。</td>
+              <td>电量、温度和存储可控；图片可稳定同步到手机或云端。</td>
+            </tr>
+            <tr>
+              <td>关键场景自动触发</td>
+              <td>用会议语音、医院关键词、停留位置、屏幕/白板、人物对话密度触发升频。</td>
+              <td>能在关键场景开始 30 秒内升级采集，并在结束后降频。</td>
+            </tr>
+            <tr>
+              <td>手机中继</td>
+              <td>测试拍照、录像、录音、文件同步、视频流预览、失败重传和弱网缓存。</td>
+              <td>手机 App 能完全接管上传链路，不强依赖厂商云。</td>
+            </tr>
+            <tr>
+              <td>后台保活</td>
+              <td>手机锁屏、App 退后台、眼镜待机、充电盒中断后恢复。</td>
+              <td>不会频繁断连；恢复后能补传媒体并保持时间线连续。</td>
+            </tr>
+            <tr>
+              <td>佩戴与发热</td>
+              <td>半天真实佩戴，记录鼻梁压迫、镜腿温度、电量下降和用户主观疲劳。</td>
+              <td>用户愿意持续佩戴；关键采集模式下不明显烫脸或影响日常活动。</td>
+            </tr>
+            <tr>
+              <td>隐私控制</td>
+              <td>测试静音、暂停记录、敏感地点禁录、数据删除、录制提示和审计日志。</td>
+              <td>用户能随时知道是否在记录，并能删除或禁止特定场景进入记忆库。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>采购前确认问题</h2>
+            <p>向厂商或销售确认时，问题要尽量具体。</p>
+          </div>
+          <p>
+            尤其是 Rokid 消费版与企业版的差异、小米是否开放 SDK、Mentra 在中国是否可稳定开发，
+            都不应只靠产品页判断。
+          </p>
+        </div>
+
+        <div class="band">
+          <ol>
+            <li>是否支持个人开发者购买开发套件，是否包含 SDK 权限、Demo、账号、API Key 和调试资料。</li>
+            <li>自开发 Android 手机 App 是否能直接控制眼镜拍照、录像、录音、视频预览和文件同步。</li>
+            <li>是否允许后台低频拍照、后台录音、手机锁屏后持续连接，以及断线后的自动重连和补传。</li>
+            <li>开发者是否能获取原始图片、视频文件、音频流或 PCM 数据，而不是只能使用厂商 App。</li>
+            <li>是否能完全接入自有云端和 RAG 服务，是否必须经过厂商云或企业平台。</li>
+            <li>低光场景是否有 HDR、夜景、多帧降噪、曝光控制或相关 API，是否可提供样张或实机测试。</li>
+            <li>国内是否能稳定安装 App、更新固件、下载 SDK、访问开发文档、购买配件并获得售后。</li>
+          </ol>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>参考链接</h2>
+            <p>正式采购前应以厂商最新资料和实机测试为准。</p>
+          </div>
+          <p>
+            智能眼镜的 SDK 权限、账号体系、系统固件和采集能力变化较快。
+            下面链接用于支撑当前判断，但不能替代采购前的销售确认和样机压测。
+          </p>
+        </div>
+        <div class="source-list">
+          <a href="https://x-docs.rokid.com/docs/terminal-sdk/getting-started/%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97.html" target="_blank" rel="noreferrer">Rokid Glass3 SDK 接入指南</a>
+          <a href="https://global.rokid.com/products/rokid-glasses" target="_blank" rel="noreferrer">Rokid Glasses 产品参数</a>
+          <a href="https://www.mi.com/global/discover/article?id=5172" target="_blank" rel="noreferrer">小米 AI 眼镜官方介绍</a>
+          <a href="https://hyperos.mi.com/continuity/abilities/ab0007" target="_blank" rel="noreferrer">小米 HyperOS 跨设备相机能力</a>
+          <a href="https://mentraglass.com/live" target="_blank" rel="noreferrer">Mentra Live 官方页面</a>
+          <a href="https://github.com/Mentra-Community/Mentra-Bluetooth-SDK-Starter-Kit" target="_blank" rel="noreferrer">Mentra Bluetooth SDK Starter Kit</a>
+        </div>
+        <p class="footnote">
+          说明：本页整理自硬件选型对话，重点服务于采购讨论。若进入实际采购，应先完成样机实测，再决定是否批量购买。
+        </p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

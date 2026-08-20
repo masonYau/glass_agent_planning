@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>文本优先记忆眼镜：采集策略与最简架构备忘录</title>
+  <style>
+    :root {
+      --bg: #f6f7f4;
+      --paper: #ffffff;
+      --ink: #17201c;
+      --muted: #66716c;
+      --line: #dce3dd;
+      --soft: #edf2ee;
+      --green: #146b4c;
+      --teal: #0f6f78;
+      --blue: #315f9d;
+      --amber: #986b18;
+      --red: #a64230;
+      --shadow: 0 18px 48px rgba(22, 34, 29, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(20, 107, 76, 0.08), transparent 360px),
+        var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.68;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--teal);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 22px 72px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border: 2px solid var(--green);
+      border-radius: 50%;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      background: var(--green);
+      border-radius: 999px;
+    }
+
+    .brand-mark::before {
+      width: 14px;
+      height: 2px;
+      left: 7px;
+      top: 13px;
+    }
+
+    .brand-mark::after {
+      width: 2px;
+      height: 14px;
+      left: 13px;
+      top: 7px;
+      opacity: 0.55;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+      gap: 28px;
+      align-items: end;
+      padding: 34px 0 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: clamp(32px, 5vw, 60px);
+      line-height: 1.08;
+      letter-spacing: 0;
+      max-width: 850px;
+    }
+
+    .lead {
+      margin: 0;
+      color: #31423a;
+      font-size: 18px;
+      max-width: 760px;
+    }
+
+    .hero-panel {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .hero-panel h2,
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      line-height: 1.3;
+    }
+
+    .hero-panel p {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      color: #24332d;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 228px minmax(0, 1fr);
+      gap: 28px;
+      margin-top: 28px;
+    }
+
+    nav {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+      backdrop-filter: blur(12px);
+    }
+
+    nav a {
+      display: block;
+      padding: 8px 9px;
+      border-radius: 6px;
+      color: #2f4038;
+      font-size: 13px;
+    }
+
+    nav a:hover {
+      background: var(--soft);
+      text-decoration: none;
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    .section {
+      margin-bottom: 26px;
+      padding: 24px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(22, 34, 29, 0.045);
+    }
+
+    .section > p:first-of-type {
+      margin-top: 0;
+    }
+
+    .section p {
+      margin: 10px 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .callout {
+      border-left: 4px solid var(--green);
+      background: #f1f7f2;
+      padding: 13px 15px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin: 14px 0;
+    }
+
+    .callout strong {
+      color: var(--green);
+    }
+
+    .warning {
+      border-left-color: var(--amber);
+      background: #fbf6e9;
+    }
+
+    .warning strong {
+      color: var(--amber);
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fbfcfa;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .metric {
+      font-size: 28px;
+      line-height: 1.1;
+      font-weight: 800;
+      color: var(--green);
+      margin: 6px 0;
+    }
+
+    .metric.blue {
+      color: var(--blue);
+    }
+
+    .metric.amber {
+      color: var(--amber);
+    }
+
+    .timeline {
+      border-left: 2px solid var(--line);
+      margin-left: 8px;
+      padding-left: 18px;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin: 0 0 18px;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: -26px;
+      top: 6px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--paper);
+      border: 3px solid var(--green);
+    }
+
+    .timeline-item h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+
+    .timeline-item p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .flow-node {
+      position: relative;
+      min-height: 128px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fbfcfa;
+    }
+
+    .flow-node::after {
+      content: "→";
+      position: absolute;
+      right: -15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-weight: 800;
+      z-index: 1;
+    }
+
+    .flow-node:last-child::after {
+      content: "";
+    }
+
+    .flow-node h3 {
+      margin: 0 0 8px;
+      color: var(--green);
+      font-size: 16px;
+    }
+
+    .flow-node p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 4px;
+      overflow-wrap: anywhere;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #31423a;
+      background: #f4f7f4;
+      font-size: 13px;
+    }
+
+    td {
+      color: #24332d;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: #24332d;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.green {
+      color: var(--green);
+      background: #e7f3eb;
+      border-color: #bedbc8;
+    }
+
+    .tag.blue {
+      color: var(--blue);
+      background: #eaf0fa;
+      border-color: #c9d7ef;
+    }
+
+    .tag.amber {
+      color: var(--amber);
+      background: #fbf2dc;
+      border-color: #ebd6a6;
+    }
+
+    code {
+      font-family: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+      background: #edf2ee;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-size: 0.92em;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      padding: 14px;
+      background: #17201c;
+      color: #eaf3ed;
+      border-radius: var(--radius);
+      overflow: auto;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    pre code {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      padding: 0;
+    }
+
+    .formula {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      background: #f4f7f4;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      color: #26362f;
+      overflow: auto;
+    }
+
+    .footnotes {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .source-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .source-list li {
+      margin: 6px 0;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+      }
+
+      .flow,
+      .grid.two,
+      .grid.three {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-node::after {
+        content: "↓";
+        right: 18px;
+        top: auto;
+        bottom: -20px;
+        transform: none;
+      }
+
+      .flow-node:last-child::after {
+        content: "";
+      }
+
+      .meta {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Text-first Memory Glasses</span>
+      </div>
+      <div class="meta">创业伙伴共享备忘录 · 2026-08-19</div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <h1>从“全天记录”收敛到“文本优先记忆层”</h1>
+        <p class="lead">
+          这份备忘录整理本轮方案讨论形成的决策脉络：完整会话音频是主数据源，视觉只在有价值的文本场景中拍静态图，图片延迟批量回传，眼镜端尽量低功耗，手机负责判断，云端负责重处理。
+        </p>
+        <div class="pill-row" aria-label="核心策略">
+          <span class="pill">A0/A1/A2 音频状态</span>
+          <span class="pill">L0/L1/L3 视觉策略</span>
+          <span class="pill">LLM 只做触发建议</span>
+          <span class="pill">15-60 分钟批量回传</span>
+          <span class="pill">Rokid 约 6 小时目标</span>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <h2>一句话结论</h2>
+        <p>
+          MVP 不做“会看世界的眼镜”，先做“能可靠记住对话和看过文字的个人文本记忆设备”。
+        </p>
+        <p>
+          关键不是拍得多，而是把音频连续性、文字覆盖率、证据可追溯和续航控制住。
+        </p>
+      </aside>
+    </section>
+
+    <div class="layout">
+      <nav aria-label="目录">
+        <a href="#summary">1. 高层结论</a>
+        <a href="#evolution">2. 方案演进</a>
+        <a href="#strategy">3. 核心采集策略</a>
+        <a href="#architecture">4. 最简架构</a>
+        <a href="#llm">5. LLM 触发</a>
+        <a href="#rokid">6. Rokid 可行性</a>
+        <a href="#battery">7. 续航估算</a>
+        <a href="#mvp">8. MVP 路线</a>
+        <a href="#risks">9. 风险与待验证</a>
+        <a href="#sources">10. 参考资料</a>
+      </nav>
+
+      <main>
+        <section id="summary" class="section">
+          <h2>1. 高层结论</h2>
+          <div class="grid three">
+            <div class="card">
+              <h3>产品收敛</h3>
+              <p>从多模态生活记录器，收敛为可检索的个人文本记忆层。音频负责完整会话，视觉负责文字证据。</p>
+            </div>
+            <div class="card">
+              <h3>架构收敛</h3>
+              <p>眼镜只做采集、缓存、批量传输；手机做状态判断和策略控制；云端做 ASR、OCR、索引。</p>
+            </div>
+            <div class="card">
+              <h3>商业收敛</h3>
+              <p>首版价值不靠炫技，而靠真实可用的“我刚才听到什么、屏幕上写了什么、药盒怎么说”。</p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <strong>当前最有把握的 MVP：</strong>
+            完整会话音频 + 人声期间每分钟视觉锚点 + 文本场景短时 1 秒拍照 + 延迟批量回传 + 云端文本化检索。
+          </div>
+        </section>
+
+        <section id="evolution" class="section">
+          <h2>2. 方案演进</h2>
+          <div class="timeline">
+            <div class="timeline-item">
+              <h3>起点：根据商业计划和硬件选型设计软件架构</h3>
+              <p>最初方案覆盖多模态采集、端云处理、记忆索引、隐私和 MVP。这个阶段的问题是范围偏大，视觉策略还容易走向高功耗。</p>
+            </div>
+            <div class="timeline-item">
+              <h3>第一次收敛：文本信息比环境影像更重要</h3>
+              <p>用户强调完整会话和完整文字信息，方案转为“文本优先”。音频保存完整会话，视觉只服务屏幕、白板、文档、药盒等文字载体。</p>
+            </div>
+            <div class="timeline-item">
+              <h3>关键澄清：完全关闭相机时无法知道画面变化</h3>
+              <p>“白板、屏幕、药盒变化时立即拍照”不能在相机完全关闭时实现。必须依赖低频探测、会话语义、用户触发或短时预览。为了续航，最终选择低频静态拍照和语义触发。</p>
+            </div>
+            <div class="timeline-item">
+              <h3>第二次收敛：延迟回传换续航</h3>
+              <p>Rokid 方案中，每张图片即时 P2P 会消耗大量无线建连和尾能耗。缓存 15-60 分钟再批量回传，可以显著降低无线唤醒次数。</p>
+            </div>
+            <div class="timeline-item">
+              <h3>最终策略：A0/A1/A2 + L0/L1/L3</h3>
+              <p>音频用三态保证隐私和会话完整性；视觉用三档控制功耗和信息价值。LLM 可以参与判断文本场景，但只能给建议，不能直接控制相机。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="strategy" class="section">
+          <h2>3. 核心采集策略</h2>
+          <p class="muted">
+            核心策略来自架构文档中的高亮部分，是目前最值得对齐的产品和工程边界。
+          </p>
+
+          <h3>音频状态</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>状态</th>
+                <th>进入条件</th>
+                <th>采集行为</th>
+                <th>退出条件</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag">A0 private</span></td>
+                <td>用户暂停、敏感地点或隐私日程</td>
+                <td>不保存原始音频，不触发视觉</td>
+                <td>用户显式恢复</td>
+              </tr>
+              <tr>
+                <td><span class="tag green">A1 listening</span></td>
+                <td>默认佩戴状态</td>
+                <td>低功耗 VAD，维护 60-120 秒加密预录环</td>
+                <td>检测到持续人声进入 A2</td>
+              </tr>
+              <tr>
+                <td><span class="tag blue">A2 conversation</span></td>
+                <td>人声持续 3-5 秒、多说话人、日程命中或手动开始</td>
+                <td>连续录音，按 60 秒切片，保留静音和重叠说话</td>
+                <td>会话结束判定成立</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>视觉等级</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>等级</th>
+                <th>相机策略</th>
+                <th>激发条件</th>
+                <th>回传策略</th>
+                <th>退出和限流</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag">L0 off</span></td>
+                <td>相机关闭</td>
+                <td>默认非会话、隐私暂停、低电或过热</td>
+                <td>无</td>
+                <td>检测到人声、用户手动记录或强日程命中后进入 L1</td>
+              </tr>
+              <tr>
+                <td><span class="tag green">L1 voice-scout</span></td>
+                <td>每 1 分钟拍 1 张低/中分辨率静态图</td>
+                <td>持续人声 3-5 秒，或 A2 会话已开始</td>
+                <td>15-60 分钟批量 P2P 回传</td>
+                <td>无人声、用户暂停、低电降级或连续无文字后回 L0</td>
+              </tr>
+              <tr>
+                <td><span class="tag amber">L3 scene-burst</span></td>
+                <td>每 1 秒拍 1 张静态图，单次 10-30 秒</td>
+                <td>手机端根据会话内容判断为屏幕、白板、文档、药盒等文本场景</td>
+                <td>先传 manifest 和关键帧，再传完整图片序列</td>
+                <td>场景结束、指纹稳定、限流、温度或电量降级后回 L1</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="warning callout">
+            <strong>重要边界：</strong>
+            L3 是短时高频静态拍照，不是视频。L1 是保底视觉锚点，不承诺单靠每分钟一张图还原所有文字。
+          </div>
+        </section>
+
+        <section id="architecture" class="section">
+          <h2>4. 最简软硬件架构</h2>
+          <div class="flow" aria-label="系统分工">
+            <div class="flow-node">
+              <h3>眼镜端</h3>
+              <p>麦克风、静态相机、本地缓存、BLE 控制、P2P 批量传输、电量/温度遥测、录音/拍照提示。</p>
+            </div>
+            <div class="flow-node">
+              <h3>手机端</h3>
+              <p>后台采集服务、VAD、低延迟转写、LLM 触发、策略门控、P2P 接收、加密缓存、上传队列。</p>
+            </div>
+            <div class="flow-node">
+              <h3>云端</h3>
+              <p>Ingestion、完整 ASR、OCR/版面恢复、去重拼接、证据定位、全文检索和 RAG 问答。</p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>模块</th>
+                <th>位置</th>
+                <th>最小职责</th>
+                <th>扩展方式</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>GlassDeviceAdapter</code></td>
+                <td>眼镜</td>
+                <td>封装麦克风、拍照、BLE、P2P、文件、电量和温度</td>
+                <td>更换 Rokid、Mentra 或自研硬件时只替换 adapter</td>
+              </tr>
+              <tr>
+                <td><code>AudioSessionManager</code></td>
+                <td>手机</td>
+                <td>管理 A0/A1/A2，固化预录，生成会话 ID</td>
+                <td>可接入更强 VAD、说话人检测和日程上下文</td>
+              </tr>
+              <tr>
+                <td><code>VisualLevelScheduler</code></td>
+                <td>手机</td>
+                <td>管理 L0/L1/L3，计算拍照间隔和 burst 时长</td>
+                <td>未来可增加手动 L2 或场景专用策略</td>
+              </tr>
+              <tr>
+                <td><code>VisualTriggerProvider</code></td>
+                <td>手机/云端</td>
+                <td>根据短转写判断是否值得进入 L3</td>
+                <td>规则、云端 LLM、本地 LLM 都输出同一 schema</td>
+              </tr>
+              <tr>
+                <td><code>CapturePolicyGate</code></td>
+                <td>手机</td>
+                <td>用隐私、电量、温度、冷却和配额审核 L3</td>
+                <td>通过远程配置调阈值，不改主状态机</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="llm" class="section">
+          <h2>5. LLM 触发架构</h2>
+          <p>
+            LLM 适合处理“这一页、右边表格、药盒说明、白板这里写的是”这类语义触发，但不适合直接控制相机。推荐架构是：LLM 做判别器，策略门控做最终执行。
+          </p>
+
+          <pre><code>眼镜麦克风
+  -> 手机端低延迟 ASR / 关键词
+  -> VisualTriggerLLM 输出结构化建议
+  -> CapturePolicyGate 检查隐私、功耗、温度、配额
+  -> VisualLevelScheduler 切换 L1/L3
+  -> GlassDeviceAdapter.takePhoto()
+  -> 本地缓存 + 延迟回传</code></pre>
+
+          <div class="grid two">
+            <div class="card">
+              <h3>LLM 输入窗口</h3>
+              <p>只看最近 10-20 秒粗转写、会话状态、最近 L1 图片粗分类、日程、电量、温度和隐私状态。</p>
+            </div>
+            <div class="card">
+              <h3>LLM 输出</h3>
+              <p>只输出 <code>should_trigger_l3</code>、<code>scene_type</code>、<code>confidence</code>、<code>ttl_seconds</code>、<code>reason_code</code>。</p>
+            </div>
+          </div>
+
+          <div class="formula">
+allow_l3 = LLM 建议触发<br>
+&nbsp;&nbsp;and confidence >= 0.75<br>
+&nbsp;&nbsp;and audio_state == A2<br>
+&nbsp;&nbsp;and privacy_allows<br>
+&nbsp;&nbsp;and battery >= 20%<br>
+&nbsp;&nbsp;and thermal == normal<br>
+&nbsp;&nbsp;and l3_budget_left > 0<br>
+&nbsp;&nbsp;and cooldown_expired
+          </div>
+        </section>
+
+        <section id="rokid" class="section">
+          <h2>6. Rokid 可行性判断</h2>
+          <p>
+            开发者文档层面，Rokid 支持这套“缓存后批量回传”的关键能力：眼镜端拍照并写文件，眼镜端发送文件，手机端建立 P2P 并接收文件。因此方案可落地，但需要我们自己实现 manifest、批处理、ACK 和清理逻辑。
+          </p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>能力</th>
+                <th>文档判断</th>
+                <th>架构含义</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>拍照落本地文件</td>
+                <td>支持 <code>takePhoto(photoResolution, path)</code></td>
+                <td>L1/L3 图片可以先缓存，不需要即时传手机</td>
+              </tr>
+              <tr>
+                <td>眼镜发文件给手机</td>
+                <td>支持文件发送、进度、完成和停止</td>
+                <td>可以按 manifest 多次发送图片和音频分片</td>
+              </tr>
+              <tr>
+                <td>手机端 P2P</td>
+                <td>支持请求连接 P2P、断开和文件接收</td>
+                <td>可以做 15-60 分钟批量回传，完成后断开</td>
+              </tr>
+              <tr>
+                <td>官方未提供</td>
+                <td>没有看到目录级批量拉取和功耗保证</td>
+                <td>批量协议和真实节电幅度必须自研并实测</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="battery" class="section">
+          <h2>7. 续航估算</h2>
+          <p>
+            续航估算按开发预算，不是厂商承诺。核心假设是 Rokid 电池 210mAh，85% 可用容量约 178.5mAh；图片延迟批量回传，避免每张图单独唤醒 P2P。
+          </p>
+
+          <div class="grid three">
+            <div class="card">
+              <h3>A1 + L0</h3>
+              <div class="metric">约 6.9-9.9h</div>
+              <p>Rokid 低功耗监听，无相机。</p>
+            </div>
+            <div class="card">
+              <h3>A2 + L1</h3>
+              <div class="metric blue">约 4.3-6.0h</div>
+              <p>完整会话音频 + 每分钟 1 张图。</p>
+            </div>
+            <div class="card">
+              <h3>A2 + L3</h3>
+              <div class="metric amber">约 1.9-2.7h</div>
+              <p>完整会话音频 + 每秒 1 张图，只能短时运行。</p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>6 小时佩戴组合</th>
+                <th>构成</th>
+                <th>Rokid 估算</th>
+                <th>结论</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>轻会话日</td>
+                <td>4.5h A1 + 1.3h A2/L1 + 0.2h A2/L3</td>
+                <td>约 6.6 小时</td>
+                <td>可以覆盖半天级轻量使用</td>
+              </tr>
+              <tr>
+                <td>合理混合目标</td>
+                <td>4.0h A1 + 1.5h A2/L1 + 0.5h A2/L3</td>
+                <td>约 5.9 小时</td>
+                <td>接近 6 小时，需要严格批量回传和 L3 限流</td>
+              </tr>
+              <tr>
+                <td>文字密集会议</td>
+                <td>3.0h A1 + 2.0h A2/L1 + 1.0h A2/L3</td>
+                <td>约 4.9 小时</td>
+                <td>L3 累计 1 小时后很难维持 6 小时</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout">
+            <strong>推荐产品参数：</strong>
+            Rokid 路线中，L1 可以作为人声期间默认视觉保底；L3 在 6 小时佩戴内累计控制在 20-30 分钟。标准批量回传 15 分钟，省电模式 60 分钟。
+          </div>
+        </section>
+
+        <section id="mvp" class="section">
+          <h2>8. MVP 路线</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>阶段</th>
+                <th>目标</th>
+                <th>验收</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>M0 硬件打通</td>
+                <td>眼镜拍照、录音、缓存、P2P 文件传输</td>
+                <td>手机能收到带 manifest 的音频和图片</td>
+              </tr>
+              <tr>
+                <td>M1 A1/A2</td>
+                <td>VAD、预录、完整会话、60 秒音频切片</td>
+                <td>会话开头丢失不超过 2 秒</td>
+              </tr>
+              <tr>
+                <td>M2 L1</td>
+                <td>A2 期间每 1 分钟拍照，15 分钟批量回传</td>
+                <td>图片序号连续，ACK 后眼镜可清理</td>
+              </tr>
+              <tr>
+                <td>M3 L3 规则版</td>
+                <td>基于关键词进入 1 秒拍照 burst</td>
+                <td>文本场景触发延迟不超过 2 秒</td>
+              </tr>
+              <tr>
+                <td>M4 L3 LLM 版</td>
+                <td>LLM 输出结构化决策，策略门控批准</td>
+                <td>误触发率、漏触发率和功耗可量化</td>
+              </tr>
+              <tr>
+                <td>M5 云端文本化</td>
+                <td>ASR/OCR 入库，证据可回溯</td>
+                <td>文本可检索，能定位到音频时间和图片</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="risks" class="section">
+          <h2>9. 风险与待验证</h2>
+          <div class="grid two">
+            <div class="card">
+              <h3>功耗真实性</h3>
+              <p>Rokid 文档没有公开 P2P 建连和拍照的电流曲线，续航数字必须用真机 60 分钟分项压测校准。</p>
+            </div>
+            <div class="card">
+              <h3>后台稳定性</h3>
+              <p>Android 锁屏、App 退后台、系统回收、弱网恢复都可能影响完整会话和批量传输。</p>
+            </div>
+            <div class="card">
+              <h3>LLM 误触发</h3>
+              <p>误触发会耗电和侵犯隐私，漏触发会丢文本。必须有规则兜底、置信度阈值和配额限流。</p>
+            </div>
+            <div class="card">
+              <h3>文字完整性</h3>
+              <p>每分钟 L1 只能保底，不能保证滚动屏幕、翻页文档和药盒转面完整，需要 L3 和用户辅助。</p>
+            </div>
+          </div>
+
+          <div class="warning callout">
+            <strong>下一个真机验证：</strong>
+            测四组 60 分钟工况：A1/L0、A2/L1 本地缓存、A2/L1 即时 P2P、A2/L1 15/60 分钟批量 P2P。记录 mAh、温度、文件丢失、P2P 次数和传输耗时。
+          </div>
+        </section>
+
+        <section id="sources" class="section">
+          <h2>10. 参考资料</h2>
+          <p class="footnotes">
+            本页是可分享的决策脉络整理，不包含逐字内部推理。详细工程方案见仓库中的 Markdown 文档。
+          </p>
+          <ul class="source-list">
+            <li><a href="../software_architecture/text_first_memory_glasses_architecture.md">文本优先的全天候记忆眼镜软件架构</a></li>
+            <li><a href="../software_architecture/minimal_text_capture_architecture.md">最简可扩展视听采集软硬件架构</a></li>
+            <li><a href="https://global.rokid.com/en-jp/products/rokid-glasses">Rokid Glasses 官方产品规格</a></li>
+            <li><a href="https://x-docs.rokid.com/docs/terminal-sdk/api-reference/Glass3%20%20SDK%28%E7%9C%BC%E9%95%9C%E7%AB%AF%29%20API%E6%96%87%E6%A1%A3.html">Rokid Glass3 眼镜端 SDK API 文档</a></li>
+            <li><a href="https://x-docs.rokid.com/docs/terminal-sdk/api-reference/Glass3%20%20SDK%28%E6%89%8B%E6%9C%BA%E7%AB%AF%29%20API%E6%96%87%E6%A1%A3.html">Rokid Glass3 手机端 SDK API 文档</a></li>
+            <li><a href="https://x-docs.rokid.com/docs/faq/P2P%E9%97%AE%E9%A2%98%E6%8E%92%E6%9F%A5.html">Rokid P2P 问题排查文档</a></li>
+          </ul>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

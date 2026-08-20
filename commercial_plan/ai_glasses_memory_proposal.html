@@ -1,0 +1,1682 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智能眼镜记忆系统方案说明</title>
+  <style>
+    :root {
+      --bg: #f5f2ec;
+      --paper: #fffdf8;
+      --ink: #17201c;
+      --muted: #64706a;
+      --line: #d9d2c4;
+      --soft: #ece7dd;
+      --teal: #0b6f6a;
+      --green: #317354;
+      --brick: #a9472d;
+      --gold: #b27a16;
+      --indigo: #42588f;
+      --radius: 8px;
+      --shadow: 0 18px 45px rgba(34, 32, 26, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(11, 111, 106, 0.07), transparent 340px),
+        var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--teal);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 22px 64px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border: 2px solid var(--teal);
+      border-radius: 50%;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      border: 2px solid var(--teal);
+      border-radius: 50%;
+      top: 7px;
+      width: 10px;
+      height: 10px;
+      background: var(--paper);
+    }
+
+    .brand-mark::before {
+      left: -7px;
+    }
+
+    .brand-mark::after {
+      right: -7px;
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 5px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 253, 248, 0.76);
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .hero {
+      min-height: 520px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 34px;
+      align-items: center;
+      padding: 50px 0 38px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      color: var(--teal);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .kicker::before {
+      content: "";
+      width: 28px;
+      height: 2px;
+      background: var(--teal);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin-bottom: 18px;
+      font-size: 46px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 720px;
+      margin-bottom: 26px;
+      color: #39413d;
+      font-size: 18px;
+      line-height: 1.8;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 8px 15px;
+      border-radius: var(--radius);
+      border: 1px solid var(--teal);
+      font-weight: 700;
+      color: var(--paper);
+      background: var(--teal);
+      box-shadow: 0 10px 22px rgba(11, 111, 106, 0.18);
+    }
+
+    .button.secondary {
+      color: var(--ink);
+      background: rgba(255, 253, 248, 0.82);
+      border-color: var(--line);
+      box-shadow: none;
+    }
+
+    .hero-notes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 690px;
+    }
+
+    .note {
+      min-height: 90px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 248, 0.72);
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .note span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .device-panel {
+      position: relative;
+      min-height: 430px;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 18% 15%, rgba(178, 122, 22, 0.16), transparent 32%),
+        linear-gradient(145deg, #fffdf8 0%, #e9efe9 100%);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .glasses-visual {
+      position: relative;
+      height: 168px;
+      margin: 8px 0 26px;
+    }
+
+    .lens {
+      position: absolute;
+      top: 52px;
+      width: 148px;
+      height: 78px;
+      border: 8px solid #25322d;
+      border-radius: 48px 48px 54px 54px;
+      background:
+        linear-gradient(135deg, rgba(11, 111, 106, 0.20), rgba(66, 88, 143, 0.10)),
+        rgba(255, 255, 255, 0.62);
+    }
+
+    .lens.left {
+      left: 24px;
+    }
+
+    .lens.right {
+      right: 24px;
+    }
+
+    .bridge {
+      position: absolute;
+      left: 50%;
+      top: 83px;
+      width: 86px;
+      height: 36px;
+      transform: translateX(-50%);
+      border-top: 8px solid #25322d;
+      border-radius: 50%;
+    }
+
+    .temple {
+      position: absolute;
+      top: 77px;
+      width: 106px;
+      height: 10px;
+      background: #25322d;
+      border-radius: 999px;
+    }
+
+    .temple.left {
+      left: -52px;
+      transform: rotate(-16deg);
+    }
+
+    .temple.right {
+      right: -52px;
+      transform: rotate(16deg);
+    }
+
+    .camera-dot {
+      position: absolute;
+      right: 64px;
+      top: 64px;
+      width: 18px;
+      height: 18px;
+      border: 4px solid #25322d;
+      border-radius: 50%;
+      background: var(--brick);
+    }
+
+    .signal {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .signal-card {
+      min-height: 104px;
+      padding: 13px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(23, 32, 28, 0.12);
+      background: rgba(255, 253, 248, 0.76);
+    }
+
+    .signal-card b {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .signal-card small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    section {
+      padding: 44px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    section:last-of-type {
+      border-bottom: none;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.36fr) minmax(0, 0.64fr);
+      gap: 26px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    h2 {
+      margin-bottom: 6px;
+      font-size: 28px;
+      line-height: 1.25;
+    }
+
+    .section-head p {
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .band {
+      padding: 22px;
+      border-radius: var(--radius);
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 25px rgba(34, 32, 26, 0.06);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .summary-item {
+      min-height: 148px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .summary-item .number {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--teal);
+      font-weight: 800;
+    }
+
+    .summary-item:nth-child(2) .number {
+      background: var(--brick);
+    }
+
+    .summary-item:nth-child(3) .number {
+      background: var(--indigo);
+    }
+
+    .summary-item:nth-child(4) .number {
+      background: var(--gold);
+    }
+
+    .summary-item h3 {
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .summary-item p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .step {
+      position: relative;
+      min-height: 160px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .step::after {
+      content: "";
+      position: absolute;
+      right: -12px;
+      top: 50%;
+      width: 12px;
+      height: 2px;
+      background: var(--line);
+    }
+
+    .step:last-child::after {
+      display: none;
+    }
+
+    .step-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 28px;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--green);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .step h3 {
+      margin-bottom: 7px;
+      font-size: 16px;
+      line-height: 1.32;
+    }
+
+    .step p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .choice-table,
+    .risk-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: var(--paper);
+      border: 1px solid var(--line);
+    }
+
+    .choice-table th,
+    .choice-table td,
+    .risk-table th,
+    .risk-table td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .choice-table th,
+    .risk-table th {
+      background: #ebe5d8;
+      font-size: 13px;
+      color: #38413c;
+    }
+
+    .choice-table tr:last-child td,
+    .risk-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      margin: 2px 4px 2px 0;
+      border-radius: 999px;
+      border: 1px solid rgba(11, 111, 106, 0.28);
+      color: var(--teal);
+      background: rgba(11, 111, 106, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.alt {
+      color: var(--brick);
+      border-color: rgba(169, 71, 45, 0.28);
+      background: rgba(169, 71, 45, 0.08);
+    }
+
+    .tag.neutral {
+      color: #535f5a;
+      border-color: rgba(83, 95, 90, 0.28);
+      background: rgba(83, 95, 90, 0.08);
+    }
+
+    .stack-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(260px, 0.2fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .architecture {
+      display: grid;
+      gap: 12px;
+    }
+
+    .arch-row {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .arch-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 68px;
+      padding: 10px;
+      border-radius: var(--radius);
+      color: var(--paper);
+      background: #25322d;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .arch-boxes {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .arch-box {
+      min-height: 68px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      font-size: 13px;
+    }
+
+    .arch-box b {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 14px;
+    }
+
+    .side-callout {
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(178, 122, 22, 0.32);
+      background: rgba(178, 122, 22, 0.10);
+    }
+
+    .side-callout h3 {
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .side-callout p {
+      color: #5e4d29;
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .phase {
+      min-height: 258px;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--paper);
+    }
+
+    .phase time {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 3px 9px;
+      margin-bottom: 14px;
+      border-radius: 999px;
+      color: var(--paper);
+      background: var(--indigo);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .phase h3 {
+      margin-bottom: 10px;
+      font-size: 17px;
+    }
+
+    ul,
+    ol {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin: 7px 0;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .metric {
+      min-height: 112px;
+      padding: 16px;
+      border-radius: var(--radius);
+      background: var(--soft);
+      border: 1px solid var(--line);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 22px;
+      line-height: 1.2;
+      color: var(--teal);
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .next-actions {
+      display: grid;
+      grid-template-columns: 0.65fr 0.35fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .action-list {
+      counter-reset: action;
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-item {
+      counter-increment: action;
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 12px;
+      padding: 14px;
+      border-radius: var(--radius);
+      background: var(--paper);
+      border: 1px solid var(--line);
+    }
+
+    .action-item::before {
+      content: counter(action);
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: var(--paper);
+      background: var(--brick);
+      font-weight: 800;
+    }
+
+    .action-item h3 {
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+
+    .action-item p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .decision-card {
+      padding: 20px;
+      border-radius: var(--radius);
+      background: #25322d;
+      color: var(--paper);
+    }
+
+    .decision-card h3 {
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    .decision-card p,
+    .decision-card li {
+      color: #dbe4df;
+    }
+
+    .action-block {
+      margin-top: 18px;
+    }
+
+    .action-block h3 {
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    .table-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cost-cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .cost-card {
+      min-height: 188px;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--paper);
+    }
+
+    .cost-card.recommended {
+      border-color: rgba(11, 111, 106, 0.45);
+      box-shadow: 0 14px 28px rgba(11, 111, 106, 0.12);
+    }
+
+    .cost-range {
+      display: block;
+      margin: 8px 0 10px;
+      color: var(--teal);
+      font-size: 27px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    .cost-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .source-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sources {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 20px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .print-note {
+      margin-top: 28px;
+      padding: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 980px) {
+      .hero,
+      .section-head,
+      .stack-layout,
+      .next-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid,
+      .roadmap,
+      .metric-grid,
+      .cost-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .pipeline {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .step::after {
+        display: none;
+      }
+
+      .arch-boxes {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        padding: 18px 14px 46px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      .hero {
+        min-height: auto;
+        padding: 32px 0 28px;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .lead {
+        font-size: 16px;
+      }
+
+      .hero-notes,
+      .summary-grid,
+      .pipeline,
+      .roadmap,
+      .two-col,
+      .metric-grid,
+      .cost-cards,
+      .sources {
+        grid-template-columns: 1fr;
+      }
+
+      .device-panel {
+        min-height: 390px;
+        padding: 20px;
+      }
+
+      .signal {
+        grid-template-columns: 1fr;
+      }
+
+      .glasses-visual {
+        transform: scale(0.82);
+        transform-origin: left center;
+        width: 122%;
+      }
+
+      .arch-row {
+        grid-template-columns: 1fr;
+      }
+
+      .arch-boxes {
+        grid-template-columns: 1fr;
+      }
+
+      .choice-table,
+      .risk-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+      }
+
+      .page {
+        max-width: none;
+        padding: 0;
+      }
+
+      .nav,
+      .hero-actions {
+        display: none;
+      }
+
+      .hero,
+      section {
+        break-inside: avoid;
+        padding: 24px 0;
+      }
+
+      .band,
+      .summary-item,
+      .step,
+      .phase {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>AI 视觉记忆系统商业方案</span>
+      </div>
+      <nav class="nav" aria-label="页面导航">
+        <a href="#idea">核心想法</a>
+        <a href="#flow">产品链路</a>
+        <a href="#stack">技术选型</a>
+        <a href="#mvp">MVP 路线</a>
+        <a href="#actions">行动与成本</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="idea">
+        <div>
+          <div class="kicker">面向合作伙伴的版本，更新于 2026-08-15</div>
+          <h1>把智能眼镜变成可对话的个人与现场记忆入口</h1>
+          <p class="lead">
+            方案核心是让眼镜捕捉一线真实场景，由手机和云端自动判断哪些片段值得保存，
+            再把音频、关键画面和视频理解结果沉淀为结构化记忆，进入 RAG 数据库，
+            最终让 AI 在对话中回答“我刚才看到了什么、发生了什么、证据在哪里”。
+          </p>
+          <div class="hero-actions">
+            <a class="button" href="#actions">查看行动与成本</a>
+            <a class="button secondary" href="#stack">查看推荐选型</a>
+          </div>
+          <div class="hero-notes">
+            <div class="note">
+              <strong>优先场景</strong>
+              <span>B 端现场记录、巡检、客户拜访、会议复盘，比泛 C 端全天候记忆更容易合规落地。</span>
+            </div>
+            <div class="note">
+              <strong>产品抓手</strong>
+              <span>不是“录很多视频”，而是“只保留有价值证据，并能被 AI 精确召回”。</span>
+            </div>
+            <div class="note">
+              <strong>技术策略</strong>
+              <span>先用成熟国产云 API 跑通闭环，后续再替换成私有化模型和自控向量库。</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="device-panel" aria-label="智能眼镜与记忆信号示意">
+          <div class="glasses-visual" aria-hidden="true">
+            <span class="temple left"></span>
+            <span class="temple right"></span>
+            <span class="lens left"></span>
+            <span class="lens right"></span>
+            <span class="bridge"></span>
+            <span class="camera-dot"></span>
+          </div>
+          <div class="signal">
+            <div class="signal-card">
+              <b>看到</b>
+              <small>关键帧、物体、文字、人物、位置线索。</small>
+            </div>
+            <div class="signal-card">
+              <b>听到</b>
+              <small>语音转写、说话人、会议要点、任务承诺。</small>
+            </div>
+            <div class="signal-card">
+              <b>记住</b>
+              <small>事件摘要、证据索引、可检索的长期记忆。</small>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>商业判断</h2>
+            <p>这个机会的价值在于把“第一视角数据”变成“可追溯的行动记忆”。</p>
+          </div>
+          <p>
+            当前智能眼镜、国产多模态模型、实时语音识别、向量数据库和云存储都已具备可集成基础。
+            难点从“技术是否存在”转为“是否能选对场景、控制成本、处理隐私、证明用户愿意持续使用”。
+          </p>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-item">
+            <span class="number">1</span>
+            <h3>痛点真实</h3>
+            <p>人会忘记细节，现场工作很难边做边记录，视频资料又难以回看和搜索。</p>
+          </article>
+          <article class="summary-item">
+            <span class="number">2</span>
+            <h3>数据独特</h3>
+            <p>眼镜获得的是第一视角、低干扰、贴近现场的数据，比手机拍摄更自然。</p>
+          </article>
+          <article class="summary-item">
+            <span class="number">3</span>
+            <h3>AI 可变现</h3>
+            <p>RAG 把记忆变成可问答的工作资产，适合按席位、设备、存储和行业模板收费。</p>
+          </article>
+          <article class="summary-item">
+            <span class="number">4</span>
+            <h3>窗口期明确</h3>
+            <p>消费级一体化方案还不成熟，B 端垂直场景有机会先形成产品壁垒。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="flow">
+        <div class="section-head">
+          <div>
+            <h2>产品链路</h2>
+            <p>从视频采集到 AI 对话，建议拆成 6 个可独立验证的模块。</p>
+          </div>
+          <p>
+            早期不要做全天候连续录像。更合理的方式是眼镜和手机维护短时缓存，
+            由规则与轻量模型判断片段价值，再把值得保存的事件上传到云端做深度理解。
+          </p>
+        </div>
+
+        <div class="pipeline">
+          <article class="step">
+            <span class="step-label">01</span>
+            <h3>眼镜采集</h3>
+            <p>摄像头、麦克风、按键、语音唤醒、场景变化和运动状态。</p>
+          </article>
+          <article class="step">
+            <span class="step-label">02</span>
+            <h3>自动判断</h3>
+            <p>手机端做 VAD、人声、关键词、画面变化、用户行为触发。</p>
+          </article>
+          <article class="step">
+            <span class="step-label">03</span>
+            <h3>分片上传</h3>
+            <p>把 30 到 120 秒事件片段上传，失败后本地排队重试。</p>
+          </article>
+          <article class="step">
+            <span class="step-label">04</span>
+            <h3>多模态理解</h3>
+            <p>ASR、OCR、关键帧描述、视频摘要、人物和地点线索提取。</p>
+          </article>
+          <article class="step">
+            <span class="step-label">05</span>
+            <h3>记忆入库</h3>
+            <p>生成结构化事件、向量索引、证据链接、时间戳和置信度。</p>
+          </article>
+          <article class="step">
+            <span class="step-label">06</span>
+            <h3>对话召回</h3>
+            <p>用户提问时检索相关记忆，把证据片段交给大模型回答。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="stack">
+        <div class="section-head">
+          <div>
+            <h2>推荐选型</h2>
+            <p>先选能最快跑通闭环的组合，再考虑成本优化和私有化。</p>
+          </div>
+          <p>
+            首版建议采用“国产硬件 + Android 中继 + 国内云 API + 托管知识库”。
+            这样可以降低硬件和模型研发压力，把前两个月的精力集中在场景验证、数据闭环和演示效果上。
+          </p>
+        </div>
+
+        <table class="choice-table" aria-label="技术选型建议表">
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>首选方案</th>
+              <th>备选方案</th>
+              <th>选择理由</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>硬件眼镜</td>
+              <td>
+                <span class="tag">Rokid Glass3</span>
+                <span class="tag">Rokid Sprite Enterprise</span>
+              </td>
+              <td>RayNeo、INMO、小米 AI 眼镜</td>
+              <td>优先看 SDK、摄像头权限、录像/推流能力、供货、商务支持和企业采购路径。Rokid 官方文档覆盖终端 SDK、设备接入、视频流等开发能力。</td>
+            </tr>
+            <tr>
+              <td>手机中继</td>
+              <td><span class="tag">Android App</span></td>
+              <td>眼镜直连云、专用边缘盒子</td>
+              <td>手机负责网络、缓存、压缩、上传和权限提示，能显著降低眼镜端功耗和硬件适配风险。</td>
+            </tr>
+            <tr>
+              <td>云基础设施</td>
+              <td><span class="tag">阿里云</span></td>
+              <td>腾讯云、火山引擎、百度智能云、华为云</td>
+              <td>阿里云百炼、DashScope、OSS、ECS 和知识库链路完整，适合快速 MVP。若重点是实时音视频，可重点评估腾讯云 TRTC。</td>
+            </tr>
+            <tr>
+              <td>实时语音</td>
+              <td><span class="tag">Paraformer / Qwen-ASR</span></td>
+              <td>讯飞实时语音转写、腾讯云 ASR、百度 ASR</td>
+              <td>先保证中文转写质量、低延迟、时间戳、说话人区分和成本可控。会议/拜访场景可优先接入专业 ASR。</td>
+            </tr>
+            <tr>
+              <td>视觉理解</td>
+              <td><span class="tag">Qwen-VL / 百炼视频理解</span></td>
+              <td>豆包视觉理解、腾讯媒体 AI、百度多模态</td>
+              <td>首版重点不是完整视频问答，而是关键帧理解、OCR、摘要和证据定位。</td>
+            </tr>
+            <tr>
+              <td>文本大模型</td>
+              <td>
+                <span class="tag">Qwen</span>
+                <span class="tag">DeepSeek</span>
+              </td>
+              <td>豆包、混元、文心、星火</td>
+              <td>中文能力、API 可用性、成本和私有化潜力都较重要。可按不同任务拆模型，而不是只选一个模型。</td>
+            </tr>
+            <tr>
+              <td>RAG 与记忆库</td>
+              <td>
+                <span class="tag">百炼知识库</span>
+                <span class="tag">Milvus / Zilliz</span>
+              </td>
+              <td>腾讯 VectorDB、VikingDB、ADB-PG、pgvector</td>
+              <td>百炼知识库适合快起步；Milvus/Zilliz 或 pgvector 适合后期增强自控、混合检索和行业化部署。</td>
+            </tr>
+            <tr>
+              <td>对象存储</td>
+              <td><span class="tag">OSS</span></td>
+              <td>COS、TOS、BOS</td>
+              <td>保存原始视频、音频、关键帧、转写结果和证据截图，必须设计生命周期策略降低存储成本。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>系统架构</h2>
+            <p>把复杂系统分层，便于并行开发和替换供应商。</p>
+          </div>
+          <p>
+            建议用中台化设计隔离硬件、模型和向量库。前期可以全托管，后期逐步把记忆抽取、向量检索、
+            权限控制和行业知识模板沉淀为自己的核心资产。
+          </p>
+        </div>
+
+        <div class="stack-layout">
+          <div class="architecture">
+            <div class="arch-row">
+              <div class="arch-label">设备层</div>
+              <div class="arch-boxes">
+                <div class="arch-box"><b>眼镜</b>拍摄、录音、短时缓存、触发</div>
+                <div class="arch-box"><b>手机</b>蓝牙/Wi-Fi P2P、上传队列</div>
+                <div class="arch-box"><b>权限提示</b>用户同意、录制状态、场景策略</div>
+                <div class="arch-box"><b>低功耗</b>少量端侧判断，重计算上云</div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-label">云处理层</div>
+              <div class="arch-boxes">
+                <div class="arch-box"><b>分片接收</b>签名上传、断点续传、去重</div>
+                <div class="arch-box"><b>媒体处理</b>ASR、OCR、抽帧、摘要</div>
+                <div class="arch-box"><b>价值评分</b>判断是否进入长期记忆</div>
+                <div class="arch-box"><b>证据索引</b>时间戳、原文件、片段引用</div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-label">记忆层</div>
+              <div class="arch-boxes">
+                <div class="arch-box"><b>结构化事件</b>人物、地点、事项、结论</div>
+                <div class="arch-box"><b>向量索引</b>语义检索、混合检索、重排</div>
+                <div class="arch-box"><b>权限域</b>个人、团队、项目、客户隔离</div>
+                <div class="arch-box"><b>生命周期</b>保留期、删除权、审计日志</div>
+              </div>
+            </div>
+            <div class="arch-row">
+              <div class="arch-label">应用层</div>
+              <div class="arch-boxes">
+                <div class="arch-box"><b>AI 对话</b>问答、追问、证据回放</div>
+                <div class="arch-box"><b>时间线</b>按天、项目、客户浏览记忆</div>
+                <div class="arch-box"><b>报告</b>会议纪要、巡检报告、拜访总结</div>
+                <div class="arch-box"><b>集成</b>企业微信、飞书、CRM、工单系统</div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="side-callout">
+            <h3>核心资产在哪里</h3>
+            <p>
+              真正的壁垒不是眼镜本身，也不是单个大模型，而是“场景触发规则、记忆抽取 schema、
+              证据引用体验、行业数据集和权限合规流程”。
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="mvp">
+        <div class="section-head">
+          <div>
+            <h2>8 周 MVP 路线</h2>
+            <p>目标是让合作伙伴在真实场景中看到闭环，而不是只看概念演示。</p>
+          </div>
+          <p>
+            MVP 应控制在一个高频场景内，例如销售拜访、设备巡检、护理交接、门店督导或项目现场记录。
+            每个场景都要能产出清晰报告，并能在对话中用证据回答问题。
+          </p>
+        </div>
+
+        <div class="roadmap">
+          <article class="phase">
+            <time>第 1-2 周</time>
+            <h3>场景与硬件验证</h3>
+            <ul>
+              <li>选择 1 个垂直场景和 3 个典型任务。</li>
+              <li>采购或借测 2 到 3 款眼镜。</li>
+              <li>验证拍摄角度、续航、音频质量、佩戴舒适度。</li>
+              <li>确认录制提示和用户授权流程。</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <time>第 3-4 周</time>
+            <h3>采集与云端处理</h3>
+            <ul>
+              <li>完成眼镜到手机的采集链路。</li>
+              <li>实现分片上传、队列、失败重试。</li>
+              <li>接入 ASR、关键帧抽取、OCR 和视频摘要。</li>
+              <li>定义事件记忆数据结构。</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <time>第 5-6 周</time>
+            <h3>记忆库与 AI 对话</h3>
+            <ul>
+              <li>把事件摘要写入向量库和结构化库。</li>
+              <li>实现按时间、人物、项目、地点检索。</li>
+              <li>对话回答必须带来源和时间戳。</li>
+              <li>产出第一版场景报告模板。</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <time>第 7-8 周</time>
+            <h3>试点与商业验证</h3>
+            <ul>
+              <li>招募 5 到 10 名真实用户试用。</li>
+              <li>记录召回准确率、保存成本和使用频次。</li>
+              <li>访谈付费意愿和采购阻力。</li>
+              <li>形成 demo、报价和下一轮开发清单。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>验证指标</h2>
+            <p>合伙人决策应看可量化结果，而不只看演示是否惊艳。</p>
+          </div>
+          <p>
+            第一阶段要证明三件事：用户愿意戴，系统记得准，企业愿意为节省时间和降低风险付费。
+            下面的指标可以作为第一轮验收标准。
+          </p>
+        </div>
+
+        <div class="band">
+          <div class="two-col">
+            <div>
+              <h3>产品可用性</h3>
+              <ul>
+                <li>从录制到可查询的平均延迟小于 5 分钟。</li>
+                <li>关键事件召回准确率达到 80% 以上。</li>
+                <li>AI 回答必须提供可回放证据，减少幻觉争议。</li>
+                <li>单次佩戴 2 小时内不明显影响正常工作。</li>
+              </ul>
+            </div>
+            <div>
+              <h3>商业可行性</h3>
+              <ul>
+                <li>每名用户每天媒体和模型成本有上限。</li>
+                <li>目标客户愿意为报告、检索、审计或培训价值付费。</li>
+                <li>设备采购、云服务和实施成本能被年费覆盖。</li>
+                <li>隐私流程能被企业法务和管理者接受。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="metric-grid">
+            <div class="metric">
+              <strong>5-10 人</strong>
+              <span>首轮真实用户规模，足够发现佩戴、录音、场景价值问题。</span>
+            </div>
+            <div class="metric">
+              <strong>30-120 秒</strong>
+              <span>建议事件片段长度，平衡上下文、成本和隐私风险。</span>
+            </div>
+            <div class="metric">
+              <strong>1 个场景</strong>
+              <span>先打透一个刚需场景，不急着做全行业通用记忆助手。</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>风险与对策</h2>
+            <p>这个项目的主要风险不是 RAG，而是数据采集边界和持续使用。</p>
+          </div>
+          <p>
+            需要从第一天就把合规、权限、删除、审计和成本做进架构里。否则即使技术 demo 可行，
+            也很难进入真实客户现场。
+          </p>
+        </div>
+
+        <table class="risk-table" aria-label="风险与对策表">
+          <thead>
+            <tr>
+              <th>风险</th>
+              <th>影响</th>
+              <th>应对策略</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>隐私与旁人同意</td>
+              <td>可能阻碍商用试点和公共场景使用。</td>
+              <td>从 B 端授权场景切入，提供明显录制提示、可见权限、脱敏、删除和审计能力。</td>
+            </tr>
+            <tr>
+              <td>续航与发热</td>
+              <td>全天录像不现实，影响佩戴体验。</td>
+              <td>眼镜只做轻量采集，手机中继和云端处理；使用滚动缓存和事件触发，避免连续上传。</td>
+            </tr>
+            <tr>
+              <td>云成本失控</td>
+              <td>视频、ASR 和多模态模型成本可能吞掉毛利。</td>
+              <td>先抽音频与关键帧，视频原件设置生命周期；只让高价值片段进入长期记忆。</td>
+            </tr>
+            <tr>
+              <td>召回错误或幻觉</td>
+              <td>用户会失去信任，尤其在工作证据场景。</td>
+              <td>所有回答绑定证据片段、时间戳和置信度；不确定时让 AI 明确说明没有足够证据。</td>
+            </tr>
+            <tr>
+              <td>硬件供应不稳定</td>
+              <td>单一硬件路线可能导致项目停摆。</td>
+              <td>设备层做适配器，把采集接口标准化；并行评估至少 2 个硬件供应商。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="actions">
+        <div class="section-head">
+          <div>
+            <h2>行动方案</h2>
+            <p>行动重点围绕三件事：关键点选择、技术方案设计、Demo 成本估算。</p>
+          </div>
+          <p>
+            合作伙伴第一次会议要避免泛泛聊市场，建议直接产出三份决策结果：
+            选哪个场景、用哪条技术路线、投入多少钱做出可演示 Demo。
+          </p>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-item">
+            <span class="number">A</span>
+            <h3>关键点选择</h3>
+            <p>把场景、硬件、云、模型、隐私边界和试点指标一次性拍板，避免 Demo 做散。</p>
+          </article>
+          <article class="summary-item">
+            <span class="number">B</span>
+            <h3>技术方案设计</h3>
+            <p>按“眼镜采集、手机中继、云端理解、记忆入库、AI 对话”拆模块设计。</p>
+          </article>
+          <article class="summary-item">
+            <span class="number">C</span>
+            <h3>Demo 成本估算</h3>
+            <p>先算 8 周 Demo 的硬件、云服务、模型调用、开发人力和试点成本。</p>
+          </article>
+          <article class="summary-item">
+            <span class="number">D</span>
+            <h3>试点决策</h3>
+            <p>Demo 成功后再决定行业 PoC、私有化部署、硬件定制和融资/商务推进。</p>
+          </article>
+        </div>
+
+        <div class="action-block band">
+          <h3>1. 关键点选择清单</h3>
+          <table class="risk-table" aria-label="关键点选择清单">
+            <thead>
+              <tr>
+                <th>关键点</th>
+                <th>建议选择</th>
+                <th>需要验证</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>首个场景</td>
+                <td><span class="tag">B 端现场记录</span> 优先选设备巡检、销售拜访、门店督导、护理交接之一。</td>
+                <td>是否有明确付费方；是否能减少记录时间；是否允许佩戴和录制；是否需要证据追溯。</td>
+              </tr>
+              <tr>
+                <td>硬件路线</td>
+                <td><span class="tag">Rokid 优先</span> 同时保留 RayNeo / INMO / 小米作为备选。</td>
+                <td>SDK 是否开放摄像头、录音、录像、推流；是否能稳定连接手机；是否能采购 2-3 台测试机。</td>
+              </tr>
+              <tr>
+                <td>采集策略</td>
+                <td><span class="tag">事件触发</span> 不做全天候连续录像，先做 30-120 秒滚动缓存。</td>
+                <td>哪些触发条件最有效：按键、语音、关键词、人声、场景变化、地理围栏或任务开始/结束。</td>
+              </tr>
+              <tr>
+                <td>云与模型</td>
+                <td><span class="tag">阿里云闭环</span> OSS + DashScope/百炼 + 知识库，先换速度，不换复杂度。</td>
+                <td>ASR 准确率、关键帧理解效果、RAG 召回质量、API 成本、数据合规和客户接受度。</td>
+              </tr>
+              <tr>
+                <td>隐私边界</td>
+                <td><span class="tag alt">必须前置</span> 录制提示、授权说明、保留期、删除权、审计日志。</td>
+                <td>试点客户的法务和现场管理是否接受；是否需要人脸模糊、敏感词过滤、数据隔离。</td>
+              </tr>
+              <tr>
+                <td>Demo 成功标准</td>
+                <td><span class="tag neutral">可量化验收</span> 从录制到可问答，小于 5 分钟；回答带证据。</td>
+                <td>召回准确率、转写质量、单位成本、用户佩戴时长、报告节省时间和复用意愿。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="action-block band">
+          <h3>2. 技术方案设计</h3>
+          <table class="risk-table" aria-label="技术方案设计表">
+            <thead>
+              <tr>
+                <th>模块</th>
+                <th>Demo 做法</th>
+                <th>后续增强</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>眼镜端</td>
+                <td>实现拍照/短视频/录音触发；优先拿到媒体文件或短流，不强依赖全天候直播。</td>
+                <td>增加端侧 VAD、场景变化检测、离线缓存、电量策略和录制状态提示。</td>
+              </tr>
+              <tr>
+                <td>手机 App</td>
+                <td>Android 作为中继：设备连接、任务开始/结束、分片上传、失败重试、用户授权页面。</td>
+                <td>加入本地滚动缓存、弱网队列、加密上传、设备管理和 OTA 适配。</td>
+              </tr>
+              <tr>
+                <td>云端 API</td>
+                <td>后端接收媒体，写入 OSS，异步触发 ASR、关键帧抽取、OCR、视频摘要。</td>
+                <td>引入任务队列、批处理成本优化、实时状态推送、租户隔离和审计日志。</td>
+              </tr>
+              <tr>
+                <td>记忆抽取</td>
+                <td>LLM 生成事件 JSON：时间、地点、人物、事项、结论、待办、证据链接、置信度。</td>
+                <td>按行业建立记忆 schema、规则校验、冲突合并、长期记忆压缩和敏感信息脱敏。</td>
+              </tr>
+              <tr>
+                <td>RAG 数据库</td>
+                <td>首版用百炼知识库或托管向量库，索引事件摘要、ASR 文本、OCR 文本和关键帧描述。</td>
+                <td>迁移到 Milvus/Zilliz、pgvector 或腾讯 VectorDB，做混合检索、重排和权限过滤。</td>
+              </tr>
+              <tr>
+                <td>AI 对话</td>
+                <td>Web Demo 提供时间线、搜索框、对话问答和证据回放，回答必须附来源。</td>
+                <td>接入企业微信/飞书/CRM/工单系统，自动生成拜访纪要、巡检报告和复盘摘要。</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="table-note">
+            Demo 交付物建议控制为：1 个眼镜采集流程、1 个手机中继 App、1 个云端处理服务、1 个记忆库、1 个 Web 对话台。
+          </p>
+        </div>
+
+        <div class="action-block band">
+          <h3>3. Demo 成本估算</h3>
+          <div class="cost-cards">
+            <article class="cost-card">
+              <span class="tag neutral">最小演示版</span>
+              <strong class="cost-range">8-15 万元</strong>
+              <p>适合内部演示：1 款眼镜、1 个场景脚本、手动触发录制、云端处理、RAG 问答和证据链接。</p>
+            </article>
+            <article class="cost-card recommended">
+              <span class="tag">推荐 MVP</span>
+              <strong class="cost-range">18-35 万元</strong>
+              <p>适合找合作客户试点：2-3 台眼镜、Android 中继、自动触发、后台任务、对话台、成本监控和授权流程。</p>
+            </article>
+            <article class="cost-card">
+              <span class="tag alt">试点增强版</span>
+              <strong class="cost-range">35-80 万元</strong>
+              <p>适合行业 PoC：多用户、多租户、权限隔离、报告模板、稳定性测试、私有化评估和客户现场部署。</p>
+            </article>
+          </div>
+
+          <table class="risk-table action-block" aria-label="Demo 成本拆分表">
+            <thead>
+              <tr>
+                <th>成本项</th>
+                <th>8 周推荐 MVP 估算</th>
+                <th>估算口径</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>硬件眼镜</td>
+                <td>1.0-3.5 万元</td>
+                <td>按 2-3 台测试机估算。消费级设备可能数千元/台，开发者或企业版可能需要商务报价。</td>
+              </tr>
+              <tr>
+                <td>手机与配件</td>
+                <td>0.5-1.5 万元</td>
+                <td>Android 测试机、备用电池、充电器、收纳、防护和现场测试配件。</td>
+              </tr>
+              <tr>
+                <td>云服务器与存储</td>
+                <td>0.2-1.0 万元</td>
+                <td>ECS、OSS、数据库、日志、带宽。媒体生命周期设置得好，Demo 阶段成本可控。</td>
+              </tr>
+              <tr>
+                <td>模型与语音服务</td>
+                <td>0.3-2.0 万元</td>
+                <td>ASR、VLM、Embedding、Rerank、LLM 对话。用关键帧和音频优先，少做整段视频理解。</td>
+              </tr>
+              <tr>
+                <td>开发人力</td>
+                <td>12-24 万元</td>
+                <td>按 2 名工程师 6-8 周估算，覆盖 Android、后端、RAG、Web Demo 和联调。</td>
+              </tr>
+              <tr>
+                <td>试点与交付</td>
+                <td>2-4 万元</td>
+                <td>试点脚本、客户培训、现场测试、隐私材料、演示视频、复盘报告和问题修复。</td>
+              </tr>
+              <tr>
+                <td><strong>推荐预算</strong></td>
+                <td><strong>18-35 万元</strong></td>
+                <td>不包含硬件定制、量产开模、私有化大模型部署、安全测评和大规模销售费用。</td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="source-note">
+            成本锚点来自公开价格页和常见外包/内部人力口径：小米 AI 眼镜等消费级设备价格在数千元级，
+            RayNeo X3 Pro 等高端设备在万元级；阿里云 OSS、ECS、DashScope/百炼、知识库按量计费，实际价格需以采购账号和地区为准。
+          </p>
+        </div>
+
+        <div class="next-actions action-block">
+          <div class="action-list">
+            <article class="action-item">
+              <div>
+                <h3>第 1-2 天：合伙人决策会</h3>
+                <p>拍板首个场景、Demo 预算、角色分工、目标客户名单和 8 周验收指标。</p>
+              </div>
+            </article>
+            <article class="action-item">
+              <div>
+                <h3>第 3-7 天：硬件与云账号准备</h3>
+                <p>采购或借测眼镜，申请 SDK，开通云资源，完成 API Key、对象存储和知识库环境。</p>
+              </div>
+            </article>
+            <article class="action-item">
+              <div>
+                <h3>第 2 周：链路样机</h3>
+                <p>跑通从录制、上传、ASR、摘要、入库到问答的最短链路，先允许人工触发。</p>
+              </div>
+            </article>
+            <article class="action-item">
+              <div>
+                <h3>第 3-6 周：Demo 产品化</h3>
+                <p>完善 Android 中继、自动触发、后台任务、证据回放、时间线和 Demo 场景脚本。</p>
+              </div>
+            </article>
+            <article class="action-item">
+              <div>
+                <h3>第 7-8 周：试点演示与复盘</h3>
+                <p>让 5-10 名真实用户试用，统计准确率、成本、使用意愿，并输出下一轮 PoC 报价。</p>
+              </div>
+            </article>
+          </div>
+
+          <aside class="decision-card">
+            <h3>本周会议输出物</h3>
+            <ol>
+              <li>一页场景定义：用户、流程、痛点、付费理由。</li>
+              <li>一张技术架构图：设备、App、云、模型、RAG。</li>
+              <li>一份成本表：最小版、推荐 MVP、增强版。</li>
+              <li>一个 Demo 脚本：现场录制 3 个事件，AI 能查回证据。</li>
+              <li>一个责任分工表：硬件、App、云端、模型、商务。</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>参考来源</h2>
+            <p>以下链接用于支撑选型方向，正式立项前仍需二次商务和技术确认。</p>
+          </div>
+          <p>
+            眼镜厂商的 SDK 权限、摄像头开放程度、量产供货和云服务价格变化较快，建议在立项前用实际账号和设备做复测。
+          </p>
+        </div>
+        <div class="sources">
+          <a href="https://x-docs.rokid.com/docs/terminal-sdk/" target="_blank" rel="noreferrer">Rokid Terminal SDK 文档</a>
+          <a href="https://www.mi.com/prod/xiaomi-ai-glasses" target="_blank" rel="noreferrer">小米 AI 眼镜官方产品页</a>
+          <a href="https://www.rayneo.com/collections/ai-smart-glasses/products/x3-pro-ai-display-glasses" target="_blank" rel="noreferrer">RayNeo X3 Pro 官方产品页</a>
+          <a href="https://help.aliyun.com/zh/model-studio/user-guide/rag-knowledge-base/" target="_blank" rel="noreferrer">阿里云百炼知识库与 RAG 文档</a>
+          <a href="https://help.aliyun.com/zh/model-studio/billing-for-knowledge-base" target="_blank" rel="noreferrer">阿里云百炼知识库计费说明</a>
+          <a href="https://help.aliyun.com/zh/model-studio/model-pricing" target="_blank" rel="noreferrer">阿里云百炼模型调用价格</a>
+          <a href="https://help.aliyun.com/zh/model-studio/websocket-for-paraformer-real-time-service" target="_blank" rel="noreferrer">阿里云 Paraformer 实时语音识别</a>
+          <a href="https://help.aliyun.com/zh/model-studio/media-video-understanding" target="_blank" rel="noreferrer">阿里云百炼视频理解</a>
+          <a href="https://cn.aliyun.com/price/detail/oss" target="_blank" rel="noreferrer">阿里云 OSS 价格详情</a>
+          <a href="https://ecs-buy.aliyun.com/price" target="_blank" rel="noreferrer">阿里云 ECS 价格详情</a>
+          <a href="https://cloud.tencent.com/product/vdb" target="_blank" rel="noreferrer">腾讯云 VectorDB</a>
+          <a href="https://cloud.tencent.com/product/trtc" target="_blank" rel="noreferrer">腾讯云 TRTC 实时音视频</a>
+          <a href="https://www.volcengine.com/product/vikingdb" target="_blank" rel="noreferrer">火山引擎 VikingDB</a>
+          <a href="https://www.xfyun.cn/doc/asr/rtasr/API.html" target="_blank" rel="noreferrer">讯飞开放平台实时语音转写</a>
+        </div>
+      </section>
+
+      <p class="print-note">
+        使用建议：这份材料适合作为第一次合伙人沟通底稿。讨论时先确认首个场景和预算，再决定硬件路线和云服务供应商。
+      </p>
+    </main>
+  </div>
+</body>
+</html>
