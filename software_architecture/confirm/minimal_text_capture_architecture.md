@@ -1,6 +1,6 @@
 # 最简可扩展视听采集软硬件架构
 
-版本：2026-08-19
+版本：2026-08-24
 
 来源策略：
 
@@ -8,8 +8,8 @@
 - `A1 listening`：默认佩戴状态，低功耗 VAD，维护 60-120 秒加密预录环形缓存。
 - `A2 conversation`：检测到持续人声后进入完整会话录音，按 60 秒切片。
 - `L0 off`：视觉默认关闭。
-- `L1 voice-scout`：人声激发后，每 1 分钟拍 1 张低/中分辨率静态图，延迟回传。
-- `L3 scene-burst`：根据会话内容判断文本场景，短时每 1 秒拍 1 张静态图，延迟回传。
+- `L1 voice-scout`：人声激发后，每 1 分钟拍 1 张低/中分辨率静态图，作为事后 OCR 证据并延迟回传。
+- `L3 scene-burst`：仅根据最近 10-20 秒音频语义判断文本场景，短时每 1 秒拍 1 张静态图，延迟回传。
 
 ## 1. 架构目标
 
@@ -36,8 +36,9 @@ flowchart LR
   subgraph Glass["智能眼镜最小硬件"]
     Mic["麦克风"]
     Cam["静态拍照相机"]
-    Store["本地缓存<br/>音频/图片/manifest"]
+    Store["本地缓存<br/>音频 spool/图片/manifest"]
     BLE["BLE 控制链路"]
+    AudioLink["实时低码音频链路"]
     P2P["Wi-Fi P2P / 高速文件传输"]
     Battery["电量/温度遥测"]
     Indicator["录音/拍照状态提示"]
@@ -59,7 +60,8 @@ flowchart LR
     Index["文本记忆索引"]
   end
 
-  Mic --> App
+  Mic --> AudioLink --> App
+  Mic --> Store
   Cam --> Store
   Battery --> App
   App <-->|"低功耗控制"| BLE
@@ -78,24 +80,25 @@ flowchart LR
 |---|---|---|---|
 | 麦克风 | 必需 | VAD、预录、完整会话音频 | 麦克风阵列、波束形成、端侧关键词 |
 | 静态拍照相机 | 必需 | L1 每分钟拍照、L3 每秒拍照 | 更高分辨率、自动曝光包围、广角矫正 |
-| 本地文件缓存 | 必需 | 弱网、延迟回传、ACK 后删除 | 更大缓存、硬件加密、安全区 |
+| 本地文件缓存 | 必需 | 图片延迟回传、实时音频断链 spool、ACK 后删除 | 更大缓存、硬件加密、安全区 |
 | BLE 控制链路 | 必需 | 状态同步、切档命令、心跳 | 自定义低功耗协议 |
-| 高速文件传输 | 必需 | 15-60 分钟批量回传图片和音频 | Wi-Fi P2P、Wi-Fi Aware、USB fallback |
+| 实时低码音频链路 | 必需 | 向手机持续提供 VAD、滚动语义判断和正式录音帧 | BLE Audio、厂商数据通道或其他稳定音频传输 |
+| 高速文件传输 | 必需 | 15-60 分钟批量回传图片，并补传断链音频 spool | Wi-Fi P2P、Wi-Fi Aware、USB fallback |
 | 电量/温度遥测 | 必需 | L3 限流和降级 | 更细粒度电流估算 |
 | 状态提示 | 必需 | 隐私合规，提示录音或拍照 | LED、声音、HUD、手机通知 |
 | IMU/按键/HUD | 可选 | 手动触发、姿态稳定、采集引导 | 文档扫描、药盒转面提示 |
 
-眼镜端的原则是“能力刚好够”：能连续收音、按命令拍静态图、把文件可靠传给手机即可。不要把核心智能放在眼镜端，否则会直接伤害续航和热稳定性。
+眼镜端的原则是“能力刚好够”：能连续收音并输出带序号的低码音频帧、短时保存断链 spool、按命令拍静态图、把文件可靠传给手机即可。不要把核心智能放在眼镜端，否则会直接伤害续航和热稳定性。
 
 ### 2.2 手机最小能力
 
 | 能力 | 必需性 | 用途 | 可扩展方向 |
 |---|---|---|---|
 | 后台采集服务 | 必需 | 保持 A1/A2/L1/L3 状态机运行 | Android 前台服务、厂商白名单 |
-| 低延迟 ASR 或关键词 | 必需 | 给 L3 触发器提供最近 10-20 秒文本 | 本地小模型、云端低延迟模型 |
-| LLM 触发器 | 必需 | 根据会话内容判断是否进入 L3 | 可替换成本地 LLM、云端 LLM 或规则模型 |
+| 低延迟 ASR 或关键词 | 必需 | 给 L3 触发器提供最近 10-20 秒音频语义 | 手机本地小模型或规则 |
+| 音频语义触发器 | 必需 | 仅根据最近转写和会话上下文判断是否建议进入 L3 | 手机本地 LLM、规则模型或关键词模型 |
 | 策略门控 | 必需 | 控制功耗、隐私、冷却和配额 | 个性化策略、企业策略 |
-| P2P 批量接收 | 必需 | 接收眼镜缓存的音频、图片和 manifest | 多设备同步、断点续传 |
+| P2P 批量接收 | 必需 | 接收图片、断链音频 spool 和 manifest | 多设备同步、断点续传 |
 | 加密本地库 | 必需 | 上传前保存媒体和元数据 | SQLCipher、对象加密、保留期策略 |
 | 云端上传队列 | 必需 | 弱网重试、幂等上传 | 充电/Wi-Fi 条件上传 |
 
@@ -132,15 +135,19 @@ flowchart TD
 |---|---|---|
 | 眼镜 | `GlassDeviceAdapter` | 封装麦克风、拍照、文件、BLE、P2P、电量和温度 |
 | 眼镜 | `GlassCaptureAgent` | 执行手机下发的 `startAudio`、`takePhoto`、`sendBatch` 命令 |
+| 眼镜 | `LocalAudioSpool` | 保存带 `source_seq` 的短时音频补偿帧，手机持久化 ACK 后清理 |
 | 眼镜 | `LocalManifestStore` | 为音频和图片写 manifest，维护 ACK 状态 |
 | 手机 | `AudioSessionManager` | 管理 A0/A1/A2，固化预录，生成会话 ID |
+| 手机 | `RealtimeAudioTransport` | 接收眼镜低码音频流，按 `source_seq` 检测实时链路缺口 |
 | 手机 | `VisualLevelScheduler` | 管理 L0/L1/L3，计算下一次拍照时间和 burst 时长 |
 | 手机 | `LowLatencyTranscriptProvider` | 输出最近 10-20 秒粗转写或关键词 |
-| 手机 | `VisualTriggerLLM` | 判断会话内容是否是文本场景 |
+| 手机 | `VisualTriggerLLM` | 仅根据最近音频语义判断会话是否进入文本场景 |
 | 手机 | `CapturePolicyGate` | 根据隐私、电量、温度、冷却和配额批准或拒绝切档 |
-| 手机 | `BatchTransferManager` | 15-60 分钟触发 P2P，接收 manifest 和文件，ACK 清理 |
+| 手机 | `BatchTransferManager` | 15-60 分钟触发 P2P，接收图片和断链音频 spool，持久化后 ACK |
 | 手机 | `EncryptedMediaStore` | 保存回传文件、上传状态和索引元数据 |
+| 手机 | `FinalizationCoordinator` | 强制刷新最终分片并等待云端收齐或超时缺片结果 |
 | 云端 | `IngestionService` | 校验分片、图片和 manifest，生成处理任务 |
+| 云端 | `CloudCompletenessGate` | 按 `expected_sequences` 判断收齐、超时缺片和迟到分片重处理 |
 | 云端 | `ConversationPipeline` | 音频拼接、ASR、说话人、时间戳 |
 | 云端 | `TextImagePipeline` | 图片 OCR、去重、版面恢复、缺失区域标注 |
 
@@ -150,7 +157,7 @@ flowchart TD
 
 | 状态                | 进入条件                | 采集行为                   | 退出条件              |
 | ----------------- | ------------------- | ---------------------- | ----------------- |
-| `A0 private`      | 用户暂停、敏感地点、隐私日程      | 不保存原始音频，不触发视觉          | 用户恢复              |
+| `A0 private`      | 用户暂停、敏感地点、隐私日程      | 不保存原始音频；若从 A2 进入则立即以 `end_reason=privacy` 封存原会话 | 用户恢复到 A1；下一次 A2 创建新会话 |
 | `A1 listening`    | 默认佩戴                | 低功耗 VAD，维护 60-120 秒预录环 | 持续人声 3-5 秒进入 A2   |
 | `A2 conversation` | 人声持续、多说话人、日程命中或手动开始 | 完整录音，60 秒切片，保留静音和重叠说话  | 静音 60-120 秒且上下文结束 |
 
@@ -161,20 +168,21 @@ flowchart TD
 | 状态               | 进入条件                  | 拍照策略                 | 输出                   |
 | ---------------- | --------------------- | -------------------- | -------------------- |
 | `L0 off`         | 默认、A0、低电、过热、无会话       | 不拍照                  | 无图片                  |
-| `L1 voice-scout` | A2 已开始或持续人声命中         | 每 1 分钟 1 张低/中分辨率图    | 图片 + manifest，延迟回传   |
-| `L3 scene-burst` | LLM 判断会话进入文本场景，且策略门批准 | 每 1 秒 1 张，单次 10-30 秒 | 图片序列 + manifest，延迟回传 |
+| `L1 voice-scout` | A2 已开始或持续人声命中         | 每 1 分钟 1 张低/中分辨率图    | 事后 OCR 证据 + manifest，延迟回传 |
+| `L3 scene-burst` | 最近 10-20 秒音频语义命中文本场景，且策略门批准 | 每 1 秒 1 张，单次 10-30 秒 | 图片序列 + manifest，延迟回传 |
 
 ```mermaid
 stateDiagram-v2
   [*] --> A1
   A1 --> A0: 隐私暂停
-  A0 --> A1: 用户恢复
+  A2 --> A0: 隐私暂停 / finalize end_reason=privacy
+  A0 --> A1: 用户恢复 / 下一次 A2 使用新会话 ID
   A1 --> A2: 人声持续 3-5 秒
   A2 --> A1: 会话结束
 
   [*] --> L0
   L0 --> L1: A2 started
-  L1 --> L3: LLM 文本场景 + Policy 通过
+  L1 --> L3: 音频语义文本场景 + Policy 通过
   L3 --> L1: burst 结束 / 指纹稳定 / 限流
   L1 --> L0: 会话结束 / 低电 / 隐私暂停
 ```
@@ -186,9 +194,9 @@ stateDiagram-v2
 - `A2` 默认 `L1`。
 - `L3` 只能从 `L1` 升级，不能绕过会话和策略门控。
 
-## 5. LLM 触发架构
+## 5. 音频语义触发架构
 
-LLM 只负责判断“现在是否值得进入 L3”，不能直接控制相机。实际切档必须经过确定性 `CapturePolicyGate`。
+规则、小模型或本地 LLM 只根据最近 10-20 秒音频语义判断“现在是否值得进入 L3”，不依赖 L1 图片及时回传，也不能直接控制相机。实际切档必须经过确定性 `CapturePolicyGate`。
 
 ```text
 recent_audio -> low_latency_transcript -> VisualTriggerLLM
@@ -210,21 +218,8 @@ power/privacy/budget/cooldown ------> CapturePolicyGate
   "audio_state": "A2_conversation",
   "recent_transcript_window_sec": 15,
   "recent_transcript": "我们看一下这一页，右边这个表格里第三季度目标是多少",
-  "recent_l1_image_hint": {
-    "has_text": true,
-    "surface_type": "screen",
-    "confidence": 0.72
-  },
-  "calendar_context": "product review meeting",
-  "power_state": {
-    "battery_percent": 58,
-    "thermal": "normal",
-    "l3_budget_left_sec_15min": 120
-  },
-  "privacy_state": {
-    "recording_allowed": true,
-    "screen_capture_allowed": true
-  }
+  "keyword_hits": ["这一页", "右边这个表格"],
+  "calendar_context": "product review meeting"
 }
 ```
 
@@ -232,12 +227,12 @@ power/privacy/budget/cooldown ------> CapturePolicyGate
 
 ```json
 {
+  "decision_id": "vtd_20260824_091612_0017",
   "should_trigger_l3": true,
   "scene_type": "screen_or_presentation",
   "confidence": 0.86,
   "ttl_seconds": 20,
-  "reason_code": "page_or_screen_reference",
-  "privacy_risk": "normal"
+  "reason_code": "page_or_screen_reference"
 }
 ```
 
@@ -257,43 +252,63 @@ allow_l3 =
 
 LLM 可以误判，策略门不能误放。所有硬约束都在 `CapturePolicyGate` 中实现，配置可远程下发。
 
-## 6. 延迟回传设计
+## 6. 采集缓存、传输与定稿
 
-延迟回传是低功耗策略的一部分。眼镜端拍照后只写本地文件和 manifest，不为每张图片单独唤醒高速链路。
+图片延迟回传是低功耗策略的一部分；音频采用“实时低码流 + 眼镜短时 spool + P2P 断链补偿”的混合数据面。
 
-### 6.1 缓存目录
+### 6.1 混合音频数据面
+
+```text
+眼镜麦克风
+  ├─ 实时低码音频链路 ─> 手机 AudioSourceRouter
+  │                         ├─ VAD / 预录
+  │                         ├─ 最近 10-20 秒音频语义
+  │                         └─ A2 正式 60 秒分片
+  └─ LocalAudioSpool ─────> 断链恢复后 P2P 补传
+```
+
+约束：
+
+- BLE 只承担控制、状态和心跳，不承担完整音频文件批量回传。
+- 每个实时帧携带 `conversation_id`、`source_seq`、`source_monotonic_ms` 和 `codec_config_id`。
+- 手机按 `source_seq` 记录最后持久化位置；断链恢复后只拉取未确认的 spool 区间。
+- `AudioContinuityGuard` 对实时帧与补传帧去重、对齐并写入剩余 `missing_ranges`。
+- 只有手机持久化补偿帧后才 ACK；眼镜随后清理对应 spool 区间。
+- 超过 spool 保留窗口仍无法补齐时，显式记录缺口，并按需要切换手机麦克风兜底。
+
+### 6.2 缓存目录
 
 ```text
 /capture_cache/
-  /audio/
-    conv_20260819_091003_0001.opus
-    conv_20260819_091003_0002.opus
+  /audio_spool/
+    conv_20260824_091003_seq_000120_000240.opus
   /image/
-    img_20260819_091530_l1_0001.jpg
-    img_20260819_091612_l3_0001.jpg
+    img_20260824_091530_l1_0001.jpg
+    img_20260824_091612_l3_0001.jpg
   audio_manifest.jsonl
   visual_manifest.jsonl
   ack_state.json
 ```
 
-### 6.2 图片 manifest
+### 6.3 图片 manifest
 
 ```json
 {
-  "capture_id": "img_20260819_091612_l3_0001",
-  "conversation_id": "conv_20260819_091003",
+  "capture_id": "img_20260824_091612_l3_0001",
+  "conversation_id": "conv_20260824_091003",
   "visual_level": "L3",
   "sequence_no": 17,
   "captured_at_monotonic_ms": 18532188,
-  "captured_at_utc": "2026-08-19T09:16:12.188+08:00",
+  "captured_at_utc": "2026-08-24T09:16:12.188+08:00",
   "trigger_reason": "llm:page_or_screen_reference",
   "resolution": "1280x720",
-  "file_path": "/capture_cache/image/img_20260819_091612_l3_0001.jpg",
-  "sha256": "..."
+  "file_path": "/capture_cache/image/img_20260824_091612_l3_0001.jpg",
+  "sha256": "...",
+  "durability_state": "CAPTURED"
 }
 ```
 
-### 6.3 批量回传流程
+### 6.4 批量回传流程
 
 ```mermaid
 sequenceDiagram
@@ -304,16 +319,22 @@ sequenceDiagram
 
   Phone->>Glass: BLE sendBatchRequest(batch_window)
   Phone->>Glass: 建立 P2P
-  Glass->>Phone: audio_manifest.jsonl + visual_manifest.jsonl
+  Glass->>Phone: pending manifest(state=CAPTURED)
   loop 每个文件
     Glass->>Phone: sendFile(file_path)
-    Phone->>Store: 校验 sha256 并写入
-    Phone->>Glass: ACK(capture_id)
+    Phone->>Store: 校验 sha256 并 stage
+    Phone->>Store: commit PHONE_COMMITTED
+    Store-->>Phone: committed
+    Phone->>Glass: ACK1(capture_id, sha256)
+    Glass->>Glass: mark GLASS_ACKED 并删除文件
   end
   Phone->>Glass: disconnect P2P
-  Glass->>Glass: 删除已 ACK 文件
   Store->>Cloud: 后台上传 manifest 和文件
+  Cloud-->>Store: ACK2(ingestion_id)
+  Store->>Store: mark CLOUD_ACKED
 ```
+
+如果 P2P、SHA 校验或手机事务 commit 失败，手机不得发送 ACK1，眼镜保持 `CAPTURED` 并重试。云端失败不回滚 ACK1，手机保留已提交副本继续重试。
 
 默认回传策略：
 
@@ -321,6 +342,34 @@ sequenceDiagram
 - 省电模式：每 60 分钟批量回传一次。
 - 高风险模式：会话结束、低电低于 15%、缓存接近上限时立即回传。
 - 弱网或手机失联：眼镜继续缓存，恢复后按 `sequence_no` 补传。
+
+### 6.5 四级持久化状态
+
+| 状态 | 持有方 | 含义 | 可清理条件 |
+|---|---|---|---|
+| `CAPTURED` | 眼镜 | 图片与 manifest 已在眼镜提交 | 收到匹配 `capture_id + sha256` 的 ACK1 |
+| `PHONE_COMMITTED` | 手机 | 手机事务已提交，可独立恢复和上传 | 不因 ACK1 丢失而回滚 |
+| `GLASS_ACKED` | 眼镜/手机状态记录 | 眼镜已确认手机持久化并可清理本地文件 | 手机副本仍必须保留到云端 ACK2 |
+| `CLOUD_ACKED` | 手机/云端 | 云端已幂等接入该证据包 | 按手机保留期策略清理 |
+
+所有重试都以 `capture_id + sha256` 幂等处理，状态只允许单向推进。
+
+### 6.6 云端收齐屏障
+
+会话结束时，手机先提交最终 manifest，其中包含 `end_reason`、`expected_sequences` 和已知 `missing_ranges`。随后由 `FinalizationCoordinator` 强制刷新待上传分片：
+
+```text
+local seal + final manifest committed
+  -> force flush pending chunks
+  -> CloudCompletenessGate(expected_sequences)
+       ├─ 全部收齐：final(version=1)
+       └─ 截止时间仍缺片：final_with_gaps(version=1, missing_ranges)
+              └─ 迟到分片：reprocess(version=2, supersedes=1)
+```
+
+- 进入 A0 时，如果当前是 A2，立即本地 seal：`end_reason=privacy`，并异步提交定稿任务；隐私停止不等待网络。
+- 用户恢复后回到 A1，下一次 A2 必须创建新的 `conversation_id`。
+- 迟到分片不能静默覆盖结果，必须保留旧版本、生成新版本并记录 `reason=late_chunk`。
 
 ## 7. 功耗预算
 
@@ -363,6 +412,8 @@ Mentra 续航 = 221 / 21.8 = 10.1h
 interface GlassDeviceAdapter {
     suspend fun startLowPowerAudio()
     suspend fun stopAudio()
+    fun observeRealtimeAudio(): Flow<EncodedAudioFrame>
+    suspend fun listAudioSpool(afterSourceSeq: Long): List<CaptureFile>
     suspend fun takePhoto(request: PhotoRequest): PhotoResult
     suspend fun listPendingFiles(window: TimeWindow): List<CaptureFile>
     suspend fun sendFile(file: CaptureFile): SendResult
@@ -376,7 +427,7 @@ interface GlassDeviceAdapter {
 
 ### 8.2 触发器适配
 
-`VisualTriggerProvider` 允许从规则、云端 LLM、本地 LLM 逐步演进：
+`VisualTriggerProvider` 允许从手机端规则、本地小模型、本地 LLM 逐步演进：
 
 ```kotlin
 interface VisualTriggerProvider {
@@ -384,7 +435,7 @@ interface VisualTriggerProvider {
 }
 ```
 
-首版可以先用规则和小 ASR，后续再接 LLM。无论触发器怎么换，输出必须是同一个结构化 schema，并继续由 `CapturePolicyGate` 审核。
+首版可以先用关键词规则和小 ASR，后续再接手机本地 LLM。无论触发器怎么换，都只接收音频语义输入，输出同一个结构化 schema，并继续由 `CapturePolicyGate` 审核。
 
 ### 8.3 策略配置
 
@@ -410,9 +461,9 @@ interface VisualTriggerProvider {
 
 | 阶段 | 目标 | 验收 |
 |---|---|---|
-| M0 硬件打通 | 眼镜拍照、录音、缓存、P2P 文件传输 | 手机能收到带 manifest 的音频和图片 |
+| M0 硬件打通 | 实时低码音频、眼镜 spool、拍照缓存、P2P 文件传输 | 手机能持续收到实时帧，并补传带 manifest 的 spool 和图片 |
 | M1 A1/A2 | VAD、预录、完整会话、60 秒音频切片 | 会话开头丢失不超过 2 秒 |
-| M2 L1 | A2 期间每 1 分钟拍照，15 分钟批量回传 | 图片序号连续，ACK 后眼镜可清理 |
+| M2 L1 | A2 期间每 1 分钟拍照，15 分钟批量回传 | 图片序号连续，PHONE_COMMITTED 后 ACK1，眼镜才清理 |
 | M3 L3 规则版 | 基于关键词进入 1 秒拍照 burst | 文本场景触发延迟不超过 2 秒 |
 | M4 L3 LLM 版 | LLM 输出结构化决策，策略门控批准 | 误触发率、漏触发率和功耗可量化 |
 | M5 云端文本化 | ASR/OCR 入库，证据可回溯 | 文本可检索，能定位到音频时间和图片 |
@@ -426,14 +477,16 @@ interface VisualTriggerProvider {
 | 音频 | A1 到 A2 触发 | 持续人声 3-5 秒内进入 A2 |
 | 音频 | 会话开头 | 预录补齐后丢失不超过 2 秒 |
 | 音频 | 分片完整性 | 60 秒切片序号连续，缺片可检测 |
+| 音频 | 实时链路补偿 | 断链恢复后按 `source_seq` 去重补传，无法恢复部分写入 `missing_ranges` |
+| 音频 | 云端定稿 | 收齐 `expected_sequences` 后 final；超时缺片为 final_with_gaps；迟到分片产生新版本 |
 | 视觉 | L0 | 非会话和隐私暂停时不拍照 |
 | 视觉 | L1 | A2 期间每 60 秒拍 1 张，误差不超过 5 秒 |
 | 视觉 | L3 | LLM 或规则命中文本场景后 2 秒内进入 burst |
 | 视觉 | L3 限流 | 单次 10-30 秒，15 分钟预算可控 |
-| 传输 | 延迟回传 | 15-60 分钟批量 P2P，ACK 后清理 |
+| 传输 | 延迟回传 | 15-60 分钟批量 P2P，PHONE_COMMITTED 后 ACK1，CLOUD_ACKED 前保留手机副本 |
 | 功耗 | Rokid 合理混合 | 目标接近 6 小时 |
 | 功耗 | 降级 | 低于 20% 停 L3，低于 10% 停自动视觉 |
-| 隐私 | 用户暂停 | A0 强制 L0，不保存原始音频和图片 |
+| 隐私 | 用户暂停 | A0 强制 L0；活动 A2 以 `end_reason=privacy` 封存，恢复后的下一次 A2 使用新会话 ID |
 
 ## 11. 关键架构决策
 
@@ -443,6 +496,9 @@ interface VisualTriggerProvider {
 | 视觉默认 | L0 关闭 | 续航和隐私优先 |
 | 视觉保底 | A2 后 L1 每分钟拍照 | 成本低，避免完全漏掉文字载体 |
 | 视觉高频 | L3 只由会话语义触发 | 把 1 秒拍照限制在高价值文本场景 |
-| 回传 | 图片和音频延迟批量回传 | 减少 P2P 频繁建连和无线尾能耗 |
+| 音频数据面 | 实时低码流 + 眼镜短时 spool + P2P 断链补传 | 同时满足低延迟语义判断和弱链路完整性 |
+| 回传 | 图片延迟批量回传，音频仅补传断链 spool | 减少 P2P 频繁建连和无线尾能耗 |
+| 定稿 | `expected_sequences` 收齐屏障 + 版本化重处理 | 防止最后分片未到就提前 ASR 定稿 |
+| 持久化 | CAPTURED → PHONE_COMMITTED → GLASS_ACKED → CLOUD_ACKED | 区分两次持久化和两次 ACK，保证崩溃可恢复 |
 | LLM 权限 | LLM 只输出建议，不直接控制相机 | 稳定性、隐私和功耗必须由确定性策略保证 |
 | 扩展方式 | Adapter + Provider + Policy Config | 后续换硬件、换模型、调参数都不动主状态机 |

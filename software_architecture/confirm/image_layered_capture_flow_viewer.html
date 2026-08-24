@@ -450,7 +450,7 @@
               <li>A0 强制 L0；A2 才允许自动 L1；L3 只能从 L1 经策略门升级。</li>
               <li>手机端下发层级策略、拍照节拍和租约；眼镜端在租约内本地定时拍照。</li>
               <li>LLM 或规则只输出建议，不能直接控制相机。</li>
-              <li>所有图片必须先写文件再写 manifest，ACK 前不能删除。</li>
+              <li>所有图片必须原子提交为 CAPTURED；手机事务进入 PHONE_COMMITTED 后才能 ACK1。</li>
               <li>低电、过热、缓存高水位、手机失联都要有降级路径。</li>
               <li>云端 OCR 结果必须回溯到 conversation_id、图片坐标和音频时间。</li>
             </ul>
@@ -488,14 +488,9 @@
         desc: "图像层级状态机。管理 L0/L1/L3、TTL、冷却和退出条件；向眼镜下发 schedule、burst 和 lease，不逐张发 takePhoto。"
       },
       "VisualTriggerLLM": {
-        device: "手机端或云端",
-        tagClass: "phone",
-        desc: "视觉触发判断器。输入最近转写、L1 图像线索和上下文，只输出结构化建议。"
-      },
-      "PhoneImageHintExtractor": {
         device: "手机端",
         tagClass: "phone",
-        desc: "轻量图像线索提取器。只做低成本 has_text、surface_type、blur、fingerprint 等提示，不承担最终 OCR。"
+        desc: "音频语义触发判断器。只输入手机端最近 10-20 秒粗转写、关键词和会话上下文，输出结构化 L3 建议。"
       },
       "CapturePolicyGate": {
         device: "策略门",
@@ -545,7 +540,7 @@
       "LocalManifestStore": {
         device: "眼镜端",
         tagClass: "store",
-        desc: "眼镜本地 manifest。记录 capture_id、conversation_id、visual_level、sequence_no、时间戳、sha256 和 ACK 状态。"
+        desc: "眼镜本地 manifest。记录 capture_id、conversation_id、visual_level、sequence_no、时间戳、sha256 和 CAPTURED/GLASS_ACKED 状态。"
       },
       "BatchTransferManager": {
         device: "手机端",
@@ -555,7 +550,7 @@
       "EncryptedMediaStore": {
         device: "手机端",
         tagClass: "store",
-        desc: "手机加密媒体库。保存图片、manifest、上传状态、质量标签和后续 OCR 元数据。"
+        desc: "手机加密媒体库。事务保存图片和 manifest，维护 PHONE_COMMITTED、GLASS_ACKED、CLOUD_ACKED 状态及后续 OCR 元数据。"
       },
       "Uploader": {
         device: "手机端",
@@ -631,7 +626,7 @@
           "手机端只在进入、续租、撤销或降级时经过策略门，不为每张 L1 图片单独下发 takePhoto。",
           "眼镜端每次本地 tick 前检查 lease、缓存水位和本地硬约束；lease 过期或撤销后自动降 L0。",
           "图片文件和 visual_manifest.jsonl 必须同事务写入，保证后续批量回传可校验。",
-          "L1 只提供文本载体保底和触发线索，不做端侧完整 OCR。"
+          "L1 只提供文本载体保底和事后 OCR 证据，不参与 L3 语义触发，也不做端侧完整 OCR。"
         ],
         participants: ["AudioSessionManager", "VisualLevelScheduler", "CapturePolicyGate", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "LocalVisualCache", "LocalManifestStore"],
         blocks: [
@@ -660,31 +655,31 @@
         ]
       },
       {
-        id: "l1-trigger-input",
-        title: "L1 图像线索与语义触发输入",
-        subtitle: "把最近 L1 图片线索和最近 10-20 秒转写合成结构化触发输入，LLM 只输出建议。",
+        id: "audio-semantic-trigger-input",
+        title: "纯音频语义触发输入",
+        subtitle: "手机端滚动处理最近 10-20 秒音频语义；L1 图片不进入触发输入，规则或模型只输出建议。",
         notes: [
-          "L1 图片可以产生轻量 image_hint，但不要在手机端做重 OCR。",
-          "触发输入必须包含 audio_state、recent_transcript、recent_l1_image_hint、预算和隐私状态。",
-          "VisualTriggerLLM 的输出是 should_trigger_l3、scene_type、confidence、ttl_seconds、reason_code。",
-          "无论模型是否建议升级，最终都必须由 CapturePolicyGate 给出 allow/deny 闭环结果。"
+          "L3 的唯一自动语义入口是手机端最近 10-20 秒粗转写或关键词，不依赖图像及时回传。",
+          "触发输入包含 audio_state、recent_transcript、conversation_context；预算和隐私由策略门读取实时值。",
+          "VisualTriggerLLM 输出 decision_id、should_trigger_l3、scene_type、confidence、ttl_seconds、reason_code。",
+          "无论模型是否建议升级，最终都必须由 CapturePolicyGate 给出 allow/deny，并记录决策事件。"
         ],
-        participants: ["VisualLevelScheduler", "LocalVisualCache", "PhoneImageHintExtractor", "LowLatencyTranscriptProvider", "VisualTriggerLLM", "CapturePolicyGate", "LocalManifestStore"],
+        participants: ["AudioSessionManager", "LowLatencyTranscriptProvider", "VisualTriggerLLM", "CapturePolicyGate", "VisualLevelScheduler", "LocalManifestStore"],
         blocks: [
-          {kind: "loop", from: 0, to: 5, label: "A2/L1 期间滚动构造触发输入"},
-          {kind: "alt", from: 6, to: 10, label: "LLM 建议升级或保持 L1"}
+          {kind: "loop", from: 0, to: 9, label: "A2/L1 期间滚动构造音频语义输入"},
+          {kind: "alt", from: 4, to: 6, label: "语义命中且策略允许"},
+          {kind: "else", from: 7, to: 8, label: "未命中或策略拒绝"}
         ],
         steps: [
-          {from: "VisualLevelScheduler", to: "LocalVisualCache", text: "readLatestL1Thumbnail(conversation_id)"},
-          {from: "LocalVisualCache", to: "PhoneImageHintExtractor", text: "downsampled_image", dashed: true},
-          {from: "PhoneImageHintExtractor", to: "PhoneImageHintExtractor", text: "detectTextSurfaceBlurFingerprint()"},
-          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerLLM", text: "recent_transcript_window(10-20s)"},
-          {from: "PhoneImageHintExtractor", to: "VisualTriggerLLM", text: "recent_l1_image_hint(has_text, surface_type, blur)"},
-          {from: "VisualLevelScheduler", to: "VisualTriggerLLM", text: "audio_state + visual_state + budget_context"},
-          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "structuredDecision(should_trigger_l3, ttl, reason)"},
+          {from: "AudioSessionManager", to: "LowLatencyTranscriptProvider", text: "publishRecentAudioWindow(10-20s)"},
+          {from: "LowLatencyTranscriptProvider", to: "LowLatencyTranscriptProvider", text: "incrementalASRAndKeywords()"},
+          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerLLM", text: "recent_transcript + keyword_hits + audio_state"},
+          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "decision(decision_id, should_trigger_l3, confidence, ttl, reason)"},
           {from: "CapturePolicyGate", to: "CapturePolicyGate", text: "evaluate privacy/power/budget/cooldown"},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl, burst_expire_at) or keepL1(reason)", dashed: true},
-          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendTriggerDecisionEvent(reason, confidence)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(decision_id, ttl, burst_expire_at)", dashed: true},
+          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendTriggerDecisionEvent(allowed, reason, confidence)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "keepL1(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendTriggerDecisionEvent(not_triggered_or_denied)"},
           {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "scheduleNextDecisionWindow()"}
         ]
       },
@@ -740,32 +735,74 @@
         subtitle: "眼镜端延迟缓存图片和 manifest，手机按窗口批量拉取，ACK 后眼镜才清理。",
         notes: [
           "L1/L3 都不为单张图片即时唤醒高速链路，降低无线尾能耗。",
-          "manifest 先传，文件按 capture_id 拉取，手机校验 sha256 后才 ACK。",
-          "眼镜只删除已 ACK 文件，上传云端失败不影响眼镜端 ACK 清理。",
-          "弱网、P2P 中断或手机失联时，从 last_ack_cursor 后继续补传。"
+          "manifest 先传，文件按 capture_id 拉取；手机必须在事务 commit 为 PHONE_COMMITTED 后才向眼镜 ACK。",
+          "眼镜收到 ACK 后标记 GLASS_ACKED 并删除本地文件；云端成功后手机再标记 CLOUD_ACKED。",
+          "云端上传失败只保留手机副本重试，不回滚眼镜 ACK；P2P、校验或手机 commit 失败则不 ACK，眼镜保留 CAPTURED。",
+          "四级状态和崩溃恢复细节见“视觉四级持久化状态与双 ACK”。"
         ],
         participants: ["BatchTransferManager", "GlassCaptureAgent", "LocalManifestStore", "LocalVisualCache", "EncryptedMediaStore", "Uploader", "IngestionService"],
         blocks: [
-          {kind: "loop", from: 5, to: 10, label: "每个 pending image 文件"},
-          {kind: "alt", from: 11, to: 15, label: "上传成功或失败重试"}
+          {kind: "loop", from: 5, to: 11, label: "每个 CAPTURED image 文件"},
+          {kind: "alt", from: 8, to: 11, label: "手机事务 commit 成功"},
+          {kind: "else", from: 16, to: 16, label: "P2P / SHA / commit 失败"},
+          {kind: "alt", from: 12, to: 15, label: "云端上传成功"},
+          {kind: "else", from: 17, to: 17, label: "云端上传失败"}
         ],
         steps: [
           {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "BLE sendBatchRequest(batch_window)"},
           {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "establishP2P()"},
-          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listPendingVisualManifest(last_ack_cursor)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listPendingVisualManifest(status=CAPTURED, last_ack_cursor)"},
           {from: "LocalManifestStore", to: "BatchTransferManager", text: "visual_manifest.jsonl", dashed: true},
           {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "beginTransaction(manifest)"},
           {from: "BatchTransferManager", to: "LocalVisualCache", text: "requestFile(capture_id)"},
           {from: "LocalVisualCache", to: "BatchTransferManager", text: "image bytes", dashed: true},
-          {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "verifyShaAndWrite(file)"},
-          {from: "EncryptedMediaStore", to: "GlassCaptureAgent", text: "ACK(capture_id)", dashed: true},
-          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "markAcked(capture_id)"},
+          {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "verifyShaAndStage(file)"},
+          {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "commitTransaction(status=PHONE_COMMITTED)"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "ACK(capture_id, sha256, state=PHONE_COMMITTED)", dashed: true},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "markState(GLASS_ACKED)"},
           {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "deleteAckedFile(capture_id)"},
-          {from: "EncryptedMediaStore", to: "Uploader", text: "enqueueUpload(manifest + files)"},
+          {from: "EncryptedMediaStore", to: "Uploader", text: "enqueueUpload(state=PHONE_COMMITTED/GLASS_ACKED)"},
           {from: "Uploader", to: "IngestionService", text: "upload visual package"},
           {from: "IngestionService", to: "Uploader", text: "ingestion_ack", dashed: true},
-          {from: "Uploader", to: "EncryptedMediaStore", text: "markUploaded()"},
-          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "keepUnackedForRetry()", dashed: true}
+          {from: "Uploader", to: "EncryptedMediaStore", text: "markState(CLOUD_ACKED)"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "noACK_keepCAPTUREDForRetry()", dashed: true},
+          {from: "Uploader", to: "EncryptedMediaStore", text: "keepPhoneCopyAndRetryCloud()", dashed: true}
+        ]
+      },
+      {
+        id: "visual-durability-ack-state",
+        title: "视觉四级持久化状态与双 ACK",
+        subtitle: "用 CAPTURED、PHONE_COMMITTED、GLASS_ACKED、CLOUD_ACKED 区分两次持久化和两次确认。",
+        notes: [
+          "CAPTURED 表示眼镜已持久化图片与 manifest；PHONE_COMMITTED 表示手机事务已提交并可独立恢复。",
+          "ACK1 只确认手机持久化：眼镜据此进入 GLASS_ACKED 并清理本地文件；ACK2 只确认云端幂等接入。",
+          "四级状态只允许单向推进；重试以 capture_id + sha256 幂等查询，不创建新 capture_id。",
+          "手机 commit 前崩溃由眼镜重传；commit 后 ACK 前崩溃由手机返回 already_committed；眼镜清理后云端失败由手机副本继续重试。"
+        ],
+        participants: ["GlassCaptureAgent", "LocalVisualCache", "LocalManifestStore", "BatchTransferManager", "EncryptedMediaStore", "Uploader", "IngestionService"],
+        blocks: [
+          {kind: "alt", from: 0, to: 2, label: "眼镜本地原子提交 CAPTURED"},
+          {kind: "alt", from: 3, to: 8, label: "ACK1：手机持久化确认"},
+          {kind: "alt", from: 9, to: 11, label: "ACK2：云端接入确认"},
+          {kind: "else", from: 12, to: 15, label: "任一阶段崩溃或重试"}
+        ],
+        steps: [
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "stageImage(capture_id, bytes)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "commitCaptureBundle(capture_id, sha256, state=CAPTURED)"},
+          {from: "LocalManifestStore", to: "GlassCaptureAgent", text: "CAPTURED committed / rollback staged file", dashed: true},
+          {from: "BatchTransferManager", to: "LocalManifestStore", text: "read(state=CAPTURED)"},
+          {from: "BatchTransferManager", to: "LocalVisualCache", text: "readFile(capture_id)"},
+          {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "verifyAndCommit(capture_id, sha256, state=PHONE_COMMITTED)"},
+          {from: "EncryptedMediaStore", to: "BatchTransferManager", text: "PHONE_COMMITTED", dashed: true},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "ACK1(capture_id, sha256)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "mark GLASS_ACKED then delete local file"},
+          {from: "Uploader", to: "IngestionService", text: "idempotentUpload(capture_id, sha256, package)"},
+          {from: "IngestionService", to: "Uploader", text: "ACK2(ingestion_id)", dashed: true},
+          {from: "Uploader", to: "EncryptedMediaStore", text: "markState(CLOUD_ACKED)"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "before PHONE_COMMITTED: no ACK, eye retries"},
+          {from: "EncryptedMediaStore", to: "BatchTransferManager", text: "after commit before ACK1: already_committed", dashed: true},
+          {from: "Uploader", to: "EncryptedMediaStore", text: "after ACK1 before ACK2: retry from phone copy"},
+          {from: "IngestionService", to: "Uploader", text: "duplicate capture_id + sha256 returns same ACK2", dashed: true}
         ]
       },
       {
@@ -877,9 +914,9 @@
         [/forceLevel\(L0|stopAutoPhoto|powerDownCamera|visual_allowed = false/, "关闭自动视觉采集，确保隐私和策略状态立即生效。"],
         [/notifyA2Started|requestLevel\(L1|installL1Schedule|renewLease/, "从正式会话进入 L1 保底视觉采样，并把节拍与租约安装到眼镜端。"],
         [/localTimerTickIfLeaseValid|burstTimerTickIfTtlAndLeaseValid|captureStill|writeImageFile|appendVisualManifest/, "眼镜端在有效租约内本地执行一次静态图采集，并把文件与 manifest 绑定成可校验证据。"],
-        [/recent_transcript|recent_l1_image_hint|structuredDecision/, "构造视觉升级判断所需的语义和图像线索。"],
+        [/recent_transcript|publishRecentAudioWindow|incrementalASRAndKeywords|decision\(decision_id/, "仅用手机端最近 10-20 秒音频语义构造 L3 候选，不依赖 L1 图片及时回传。"],
         [/allowL3|startBurst|burst_expire_at|consumeBudget|downgrade|revokeToL1|returnToInstalledL1Schedule/, "推进 L3 短 burst，并持续受过期时间、租约、预算、温度和冷却约束。"],
-        [/sendBatchRequest|establishP2P|ACK|deleteAckedFile|keepUnacked/, "执行延迟批量回传，保证 ACK 前不丢失眼镜端文件。"],
+        [/sendBatchRequest|establishP2P|PHONE_COMMITTED|ACK1|ACK2|CLOUD_ACKED|deleteAckedFile/, "推进四级持久化状态；手机事务提交后才能 ACK1，云端 ACK2 失败只由手机副本重试。"],
         [/runOCR|Layout|Quality|writeEvidence|TextMemoryIndex/, "把图片序列转成可检索文本，并保留质量标签和证据坐标。"],
         [/battery_low|thermal_high|cache_near_full|recomputeMaxAllowedLevel|restoreAllowedLevel/, "处理异常降级和恢复，保证每个状态变化都有可解释原因。"]
       ];
@@ -896,7 +933,7 @@
       if (/L1|l1_tick|voice-scout|interval=60s|installL1Schedule|renewLease/.test(text)) {
         return "影响：手机端授权 L1 节拍和租约，眼镜端在租约内本地低频采样，不触发即时上传。";
       }
-      if (/Trigger|structuredDecision|confidence|recent_l1_image_hint|recent_transcript/.test(text)) {
+      if (/Trigger|decision_id|confidence|recent_transcript|AudioWindow|incrementalASR/.test(text)) {
         return "影响：生成 L3 候选判断，但相机控制权仍在策略门和调度器手里。";
       }
       if (/L3|burst|ttl|burst_expire_at|expire_at|budget|consumeBudget|fingerprint|lease_ttl|revokeToL1/.test(text)) {
