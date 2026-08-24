@@ -461,7 +461,7 @@
       "AudioSessionManager": {
         device: "手机端",
         tagClass: "phone",
-        desc: "音频状态机主控。管理 A0/A1/A2，创建会话 ID，固化预录，并通知视觉层进入或退出 L1。"
+        desc: "音频状态机主控。管理 A0/A1/A2、privacy lock 和 BOUNDARY_PENDING，创建会话并驱动 binding OPEN/CHECKPOINT/CLOSE。"
       },
       "GlassCaptureAgent": {
         device: "眼镜端",
@@ -481,7 +481,7 @@
       "LocalAudioSpool": {
         device: "眼镜端",
         tagClass: "store",
-        desc: "眼镜端短时音频补偿缓存。实时链路中断时继续保存带序号的编码帧，恢复后通过 P2P 补传，手机持久化 ACK 后清理。"
+        desc: "眼镜端持续滚动音频补偿缓存。租约有效时保存带序号的编码帧，恢复后通过 P2P 补传，只清理 range ACK 明确覆盖的 block。"
       },
       "眼镜麦克风": {
         device: "眼镜端",
@@ -499,9 +499,9 @@
         desc: "低功耗人声检测。首版建议放手机端；若眼镜 SDK 支持稳定低功耗 VAD，可下沉到眼镜端减少音频链路压力。"
       },
       "PreRollAudioBuffer": {
-        device: "手机端优先，可选眼镜端",
+        device: "手机端",
         tagClass: "phone",
-        desc: "60-120 秒加密预录环形缓存。用于补齐自动检测晚于会话开头的问题。"
+        desc: "M3 手机端 60-120 秒加密预录环形缓存。用于补齐自动检测晚于会话开头的问题，不与眼镜 spool 混用。"
       },
       "ConversationDetector": {
         device: "手机端",
@@ -511,7 +511,7 @@
       "ConversationRecorder": {
         device: "手机端优先",
         tagClass: "phone",
-        desc: "会话录音和切片模块。负责编码、60 秒分片、序号、时间戳、样本数和校验和。眼镜支持本地长录时可下沉。"
+        desc: "会话录音和切片模块。接收眼镜端已编码帧，负责 60 秒分片、序号、时间戳、样本数和校验和；单个 chunk 不混合音源。"
       },
       "EncryptedMediaStore": {
         device: "手机端",
@@ -551,12 +551,12 @@
       "CloudCompletenessGate": {
         device: "云端",
         tagClass: "cloud",
-        desc: "云端完整性屏障。根据 expected_sequences 判断分片是否收齐；超时后输出 final_with_gaps，迟到分片触发版本化重处理。"
+        desc: "云端完整性屏障。根据 binding CLOSE 和 expected_stream_ranges 判断时间线是否收齐；超时输出 final_with_gaps。"
       },
-      "VisualTriggerLLM": {
+      "VisualTriggerProvider": {
         device: "手机端",
         tagClass: "phone",
-        desc: "手机端音频语义触发判断器。可由规则、轻量模型或本地 LLM 实现，只根据最近转写输出是否建议升级 L3，不能直接控制相机。"
+        desc: "手机端音频语义触发判断器。M3 使用关键词/规则，M4 可替换本地 LLM；只输出升级建议，不能直接控制相机。"
       },
       "IngestionService": {
         device: "云端",
@@ -576,7 +576,12 @@
       "AudioSourceRouter": {
         device: "手机端",
         tagClass: "phone",
-        desc: "音频源路由。负责眼镜麦克风、眼镜本地录音和手机麦克风之间的切换、重叠和去重。"
+        desc: "音频源路由。M3 只强制 GLASSES stream；未来 PHONE stream 使用独立 boot/stream/sequence 和 timeline segment。"
+      },
+      "ConversationBindingStore": {
+        device: "手机端",
+        tagClass: "store",
+        desc: "追加式会话绑定存储。以 OPEN/CHECKPOINT/CLOSE 把 source_seq 区间归属到 conversation，并固化隐私或重启结束边界。"
       }
     };
 
@@ -584,31 +589,33 @@
       {
         id: "a0-private",
         title: "A0 Private 隐私暂停",
-        subtitle: "暂停时强制停止音频预录，并通知视觉进入 L0。",
+        subtitle: "持久化 privacy lock，拦截旧 generation 回调，并在最终 source_seq 明确后关闭会话 binding。",
         notes: [
           "A0 是硬隐私状态，必须优先于所有自动检测。",
           "进入 A0 后清空或停止预录环，不保存原始音频。",
           "A0 会强制视觉进入 L0，避免音频暂停但相机继续工作的错配。",
-          "如果 A2 中途进入 A0，立即以 end_reason=privacy 封存并 finalize 原会话，不保留跨隐私区间的悬空会话。",
-          "恢复后进入 A1；下一次进入 A2 时必须创建新的 conversation_id。隐私停止不等待网络上传完成。"
+          "如果 A2 中途进入 A0，手机立即 LOCAL_SEALED，并进入 BOUNDARY_PENDING；眼镜返回最后 source_seq 后再 CLOSE binding。",
+          "privacy lock 持久化后递增 capture generation，旧 generation 的迟到音频/拍照回调 fail-closed 丢弃。",
+          "恢复必须引用当前 privacy_lock_id 和明确 user_action_id；恢复后进入 A1，新建 stream，下一次 A2 创建新 conversation_id。"
         ],
-        participants: ["用户", "手机 App", "PrivacyPolicyGate", "AudioSessionManager", "ConversationRecorder", "EncryptedMediaStore", "FinalizationCoordinator", "GlassCaptureAgent", "PreRollAudioBuffer", "VisualLevelScheduler"],
+        participants: ["用户", "手机 App", "PrivacyPolicyGate", "AudioSessionManager", "ConversationRecorder", "ConversationBindingStore", "EncryptedMediaStore", "FinalizationCoordinator", "GlassCaptureAgent", "PreRollAudioBuffer", "VisualLevelScheduler"],
         blocks: [
-          {kind: "alt", from: 4, to: 8, label: "如果当前处于 A2：先本地封存原会话"},
-          {kind: "loop", from: 13, to: 14, label: "A0 持续期间：不采集原始音频"}
+          {kind: "alt", from: 4, to: 9, label: "如果当前处于 A2：本地 seal 后异步确定结束边界"},
+          {kind: "loop", from: 14, to: 15, label: "A0 持续期间：不采集原始音频"}
         ],
         steps: [
           {from: "用户", to: "手机 App", text: "点击暂停 / 敏感地点 / 隐私日程命中"},
           {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluatePrivacyContext()"},
           {from: "PrivacyPolicyGate", to: "手机 App", text: "recording_allowed = false", dashed: true},
-          {from: "手机 App", to: "AudioSessionManager", text: "enter(A0 private)"},
-          {from: "AudioSessionManager", to: "ConversationRecorder", text: "closeActiveChunkIfA2()"},
-          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "sealConversation(end_reason=privacy, expected_sequences)"},
-          {from: "EncryptedMediaStore", to: "AudioSessionManager", text: "final_manifest_committed", dashed: true},
-          {from: "AudioSessionManager", to: "FinalizationCoordinator", text: "enqueueFinalize(conversation_id, end_reason=privacy)"},
-          {from: "FinalizationCoordinator", to: "AudioSessionManager", text: "queued_without_blocking_privacy", dashed: true},
+          {from: "手机 App", to: "AudioSessionManager", text: "persistPrivacyLockAndEnterA0(capture_generation++)"},
+          {from: "AudioSessionManager", to: "ConversationRecorder", text: "localSealActiveChunkIfA2()"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "commitLocalSeal(state=BOUNDARY_PENDING)"},
+          {from: "AudioSessionManager", to: "GlassCaptureAgent", text: "ENTER_PRIVATE(privacy_lock_id, new_epoch)"},
+          {from: "GlassCaptureAgent", to: "AudioSessionManager", text: "ACK(last_generated_source_seq, stopped_at)", dashed: true},
+          {from: "AudioSessionManager", to: "ConversationBindingStore", text: "append CLOSE(last_seq or UNKNOWN, end_reason=privacy)"},
+          {from: "AudioSessionManager", to: "FinalizationCoordinator", text: "enqueueFinalizeAfterBoundary(conversation_id)"},
           {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "clearAndStop()"},
-          {from: "AudioSessionManager", to: "GlassCaptureAgent", text: "stopAudioCapture()"},
+          {from: "AudioSessionManager", to: "GlassCaptureAgent", text: "oldGenerationCallbacksMustBeDropped()"},
           {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "forceLevel(L0 off)"},
           {from: "手机 App", to: "用户", text: "显示录音已暂停", dashed: true},
           {from: "GlassCaptureAgent", to: "AudioSessionManager", text: "不发送原始音频", dashed: true},
@@ -616,7 +623,7 @@
           {from: "用户", to: "手机 App", text: "恢复记录"},
           {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluatePrivacyContext()"},
           {from: "PrivacyPolicyGate", to: "手机 App", text: "recording_allowed = true", dashed: true},
-          {from: "手机 App", to: "AudioSessionManager", text: "enter(A1 listening, require_new_conversation_id=true)"},
+          {from: "手机 App", to: "AudioSessionManager", text: "RESUME_FROM_PRIVATE(privacy_lock_id, user_action_id)"},
           {from: "AudioSessionManager", to: "GlassCaptureAgent", text: "startLowPowerAudio()"},
           {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "startEncryptedRingBuffer(60-120s)"},
           {from: "AudioSessionManager", to: "AudioSessionManager", text: "next A2 must create new conversation_id"}
@@ -629,7 +636,7 @@
         notes: [
           "A1 不生成正式会话，只维护短预录。",
           "VAD 负责低功耗人声检测，ConversationDetector 决定是否进入 A2。",
-          "预录环建议手机端优先，眼镜本地低功耗录音成熟后可下沉。"
+          "M3 预录环固定在手机端；眼镜 LocalAudioSpool 只负责链路补偿。"
         ],
         participants: ["Glass Mic", "手机后台服务", "LowPowerVAD", "PreRollAudioBuffer", "ConversationDetector", "CapturePolicyGate"],
         blocks: [
@@ -640,7 +647,7 @@
         steps: [
           {from: "手机后台服务", to: "Glass Mic", text: "startLowPowerAudio()"},
           {from: "手机后台服务", to: "PreRollAudioBuffer", text: "startEncryptedRingBuffer(60-120s)"},
-          {from: "Glass Mic", to: "手机后台服务", text: "low_power_audio_frame"},
+          {from: "Glass Mic", to: "手机后台服务", text: "frame(GLASSES, boot_id, stream_id, source_seq, conversation_id=null)"},
           {from: "手机后台服务", to: "LowPowerVAD", text: "detectVoice(frame)"},
           {from: "手机后台服务", to: "PreRollAudioBuffer", text: "appendEncrypted(frame)"},
           {from: "LowPowerVAD", to: "ConversationDetector", text: "voice_activity_score", dashed: true},
@@ -655,18 +662,19 @@
         title: "A1 -> A2 会话触发",
         subtitle: "检测到会话后固化预录，创建会话并启动完整录音。",
         notes: [
-          "会话 ID 应在固化预录前生成，确保预录片段归属明确。",
+          "会话 ID 应在固化预录前生成，并事务提交 binding OPEN；历史 A1 帧不回写 conversation_id。",
           "预录应从首个有效人声前约 2 秒开始，降低会话开头丢失。",
           "进入 A2 后通知视觉层启用 L1，每分钟拍照保底。",
           "A2 启动后开启手机端滚动 10-20 秒粗转写；L3 只根据音频语义触发，不依赖 L1 图像线索或云端探测包。",
           "正式音频仍按 15-60 分钟或会话结束条件批量上传，和本地语义判断相互独立。"
         ],
-        participants: ["ConversationDetector", "AudioSessionManager", "PreRollAudioBuffer", "ConversationRecorder", "EncryptedMediaStore", "VisualLevelScheduler", "LowLatencyTranscriptProvider", "UploadQueue"],
+        participants: ["ConversationDetector", "AudioSessionManager", "PreRollAudioBuffer", "ConversationBindingStore", "ConversationRecorder", "EncryptedMediaStore", "VisualLevelScheduler", "LowLatencyTranscriptProvider", "UploadQueue"],
         steps: [
           {from: "ConversationDetector", to: "AudioSessionManager", text: "requestEnterA2(trigger, confidence)"},
           {from: "AudioSessionManager", to: "AudioSessionManager", text: "createConversationId()"},
           {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "freezeRange(first_voice - 2s, now)"},
           {from: "PreRollAudioBuffer", to: "AudioSessionManager", text: "preroll_audio_segment", dashed: true},
+          {from: "AudioSessionManager", to: "ConversationBindingStore", text: "append OPEN(first_source_seq, trigger_source_seq)"},
           {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "persistPreroll(conversation_id, segment)"},
           {from: "AudioSessionManager", to: "ConversationRecorder", text: "startConversation(conversation_id)"},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeAudioManifest(sequence_no=0, type=preroll)"},
@@ -687,22 +695,23 @@
           "正常音频也统一经过 AudioSourceRouter，后续切到手机麦克风时不改主链路。",
           "上传窗口按 15-60 分钟策略批量；会话结束时由 FinalizationCoordinator 强制刷新，弱网不阻塞录音。"
         ],
-        participants: ["Glass Mic", "AudioSourceRouter", "ConversationRecorder", "EncryptedMediaStore", "AudioContinuityGuard", "UploadQueue", "IngestionService"],
+        participants: ["Glass Mic", "AudioSourceRouter", "ConversationRecorder", "EncryptedMediaStore", "ConversationBindingStore", "AudioContinuityGuard", "UploadQueue", "IngestionService"],
         blocks: [
-          {kind: "loop", from: 0, to: 13, label: "A2 会话进行中"},
-          {kind: "alt", from: 4, to: 9, label: "当前分片达到 60 秒"},
-          {kind: "alt", from: 10, to: 13, label: "到达 15-60 分钟上传窗口"}
+          {kind: "loop", from: 0, to: 14, label: "A2 会话进行中"},
+          {kind: "alt", from: 4, to: 10, label: "当前分片达到 60 秒"},
+          {kind: "alt", from: 11, to: 14, label: "到达 15-60 分钟上传窗口"}
         ],
         steps: [
-          {from: "Glass Mic", to: "AudioSourceRouter", text: "audio_frame(source=glasses, timestamp, samples)"},
+          {from: "Glass Mic", to: "AudioSourceRouter", text: "encodedFrame(GLASSES, boot_id, stream_id, source_seq, capture_generation)"},
           {from: "AudioSourceRouter", to: "ConversationRecorder", text: "forward(frame)"},
-          {from: "ConversationRecorder", to: "ConversationRecorder", text: "encode(Opus/LC3)"},
+          {from: "ConversationRecorder", to: "ConversationRecorder", text: "validateCodecConfigAndGeneration()"},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "appendToCurrentChunk()"},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "closeChunk(sequence_no, start_ms, end_ms, sample_count, sha256)"},
           {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "verifyChunkContinuity(sequence_no)"},
           {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "continuity_ok / gap_detected", dashed: true},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "persistGapEventIfNeeded(gap_range)"},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeAudioManifest(chunk_meta)"},
+          {from: "ConversationRecorder", to: "ConversationBindingStore", text: "append CHECKPOINT(committed_through_source_seq)"},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "openNextChunk(sequence_no + 1)"},
           {from: "UploadQueue", to: "EncryptedMediaStore", text: "readAudioManifest(status=pending/retry)"},
           {from: "UploadQueue", to: "IngestionService", text: "uploadManifestAndChunks()"},
@@ -717,11 +726,11 @@
         notes: [
           "结束不能只依赖短静音，建议先进入 EndPending，再由 60-120 秒静音加上下文结束确认。",
           "EndPending 期间如果人声恢复，需要取消结束候选并回到 Active。",
-          "缺片必须显式写入 missing_ranges，不能由模型补写。",
+          "缺片必须显式写入 missing_ranges，binding CLOSE 必须记录最后期望序号和 end_boundary_quality。",
           "本场景只负责本地 seal 和提交定稿任务；上传收齐、超时缺片和迟到分片重处理见“云端收齐屏障与版本化定稿”。",
           "视觉层收到会话结束后回到 L0，音频主状态回到 A1；云端定稿不阻塞下一次采集。"
         ],
-        participants: ["ConversationDetector", "AudioSessionManager", "ConversationRecorder", "AudioContinuityGuard", "EncryptedMediaStore", "VisualLevelScheduler", "FinalizationCoordinator"],
+        participants: ["ConversationDetector", "AudioSessionManager", "ConversationRecorder", "AudioContinuityGuard", "ConversationBindingStore", "EncryptedMediaStore", "VisualLevelScheduler", "FinalizationCoordinator"],
         blocks: [
           {kind: "alt", from: 1, to: 1, label: "EndPending 期间人声恢复"},
           {kind: "else", from: 2, to: 14, label: "结束条件确认后执行本地 seal"},
@@ -738,10 +747,11 @@
           {from: "AudioContinuityGuard", to: "AudioSessionManager", text: "timeline_ok(missing_ranges=[])", dashed: true},
           {from: "AudioContinuityGuard", to: "AudioSessionManager", text: "missing_ranges", dashed: true},
           {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "markMissingRanges(missing_ranges)"},
-          {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "commitFinalManifest(end_reason, expected_sequences)"},
+          {from: "AudioSessionManager", to: "ConversationBindingStore", text: "append CLOSE(last_expected_source_seq, boundary_quality)"},
+          {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "commitFinalManifest(binding_ids, expected_stream_ranges)"},
           {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "notifyConversationEnded()"},
           {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "L1/L3 -> L0"},
-          {from: "AudioSessionManager", to: "FinalizationCoordinator", text: "enqueueFinalize(conversation_id, expected_sequences, missing_ranges)"},
+          {from: "AudioSessionManager", to: "FinalizationCoordinator", text: "enqueueFinalize(conversation_id, expected_stream_ranges, missing_ranges)"},
           {from: "FinalizationCoordinator", to: "AudioSessionManager", text: "finalization_queued", dashed: true},
           {from: "AudioSessionManager", to: "AudioSessionManager", text: "enter(A1 listening) / restart preroll"}
         ]
@@ -756,7 +766,7 @@
           "规则或本地小模型只输出结构化建议；CapturePolicyGate 重新检查 A2、隐私、功耗、预算和冷却。",
           "A2 结束或进入 A0 时立即停止滚动窗口并使未应用的 decision_id 失效。"
         ],
-        participants: ["ConversationRecorder", "LowLatencyTranscriptProvider", "AudioSessionManager", "VisualTriggerLLM", "CapturePolicyGate", "VisualLevelScheduler", "EncryptedMediaStore"],
+        participants: ["ConversationRecorder", "LowLatencyTranscriptProvider", "AudioSessionManager", "VisualTriggerProvider", "CapturePolicyGate", "VisualLevelScheduler", "EncryptedMediaStore"],
         blocks: [
           {kind: "loop", from: 0, to: 11, label: "A2 期间按 decision_window 滚动判断"},
           {kind: "alt", from: 5, to: 8, label: "语义命中且策略允许"},
@@ -765,9 +775,9 @@
         steps: [
           {from: "ConversationRecorder", to: "LowLatencyTranscriptProvider", text: "publishRecentFrames(window=10-20s)"},
           {from: "LowLatencyTranscriptProvider", to: "LowLatencyTranscriptProvider", text: "incrementalASRAndKeywords()"},
-          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerLLM", text: "recent_transcript + keyword_hits"},
-          {from: "AudioSessionManager", to: "VisualTriggerLLM", text: "audio_state + conversation_context"},
-          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "decision(decision_id, should_trigger_l3, confidence, ttl, reason)"},
+          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerProvider", text: "recent_transcript + keyword_hits"},
+          {from: "AudioSessionManager", to: "VisualTriggerProvider", text: "audio_state + conversation_context"},
+          {from: "VisualTriggerProvider", to: "CapturePolicyGate", text: "ruleDecision(decision_id, should_trigger_l3, confidence, ttl, reason)"},
           {from: "CapturePolicyGate", to: "CapturePolicyGate", text: "recheck A2/privacy/power/budget/cooldown/current_level"},
           {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(decision_id, ttl, reason)", dashed: true},
           {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "L1 -> L3 scene-burst(10-30s)"},
@@ -784,10 +794,10 @@
         subtitle: "实时低码音频送手机做 VAD、语义判断和录音；眼镜短时 spool 在断链后通过 P2P 补齐。",
         notes: [
           "BLE 只承担控制和心跳；实时音频使用硬件支持的稳定音频数据链路，补偿文件使用 P2P。",
-          "每帧同时携带 conversation_id、source_seq、source_monotonic_ms 和 codec_config_id，手机以 source_seq 作为补传游标。",
-          "手机实时收到的帧直接进入 AudioSourceRouter；眼镜 LocalAudioSpool 只承担短时断链补偿，不作为日常重复上传副本。",
-          "补偿帧由 AudioContinuityGuard 去重和对齐；超过 spool 保留窗口仍无法恢复时写 missing_range，并进入手机麦克风兜底场景。",
-          "只有手机持久化补偿帧后才 ACK，眼镜随后删除对应 spool 区间。"
+          "每帧携带 source_kind、boot_id、stream_id、source_seq、capture_generation 和 codec_config_id；conversation_id 在 A1 为空，在 A2 也只作冗余。",
+          "眼镜 LocalAudioSpool 在租约有效时持续滚动保存；断链后才开始 spool 会漏掉断链检测前的尾部帧。",
+          "补偿帧由 AudioContinuityGuard 去重和对齐；M3 未启用 PHONE fallback 时，无法恢复部分必须写 missing_range。",
+          "只有手机事务持久化帧、manifest 和 gap 后才发送 range ACK；眼镜不得用跨空洞标量游标删除 block。"
         ],
         participants: ["GlassCaptureAgent", "Glass Mic", "LocalAudioSpool", "RealTimeAudioLink", "AudioSourceRouter", "ConversationRecorder", "EncryptedMediaStore", "BatchTransferManager", "AudioContinuityGuard"],
         blocks: [
@@ -795,9 +805,9 @@
           {kind: "alt", from: 7, to: 17, label: "实时链路中断后从 source_seq 补传"}
         ],
         steps: [
-          {from: "GlassCaptureAgent", to: "Glass Mic", text: "startEncodedAudio(codec, source_seq=0)"},
-          {from: "Glass Mic", to: "GlassCaptureAgent", text: "encoded_frame(source_seq, monotonic_ms)", dashed: true},
-          {from: "GlassCaptureAgent", to: "LocalAudioSpool", text: "appendShortSpool(frame)"},
+          {from: "GlassCaptureAgent", to: "Glass Mic", text: "startEncodedAudio(GLASSES, boot_id, stream_id, generation)"},
+          {from: "Glass Mic", to: "GlassCaptureAgent", text: "encoded_frame(source_seq, monotonic_us, generation)", dashed: true},
+          {from: "GlassCaptureAgent", to: "LocalAudioSpool", text: "appendContinuousRollingSpool(frame)"},
           {from: "GlassCaptureAgent", to: "RealTimeAudioLink", text: "stream(frame)"},
           {from: "RealTimeAudioLink", to: "AudioSourceRouter", text: "deliver(frame)"},
           {from: "AudioSourceRouter", to: "ConversationRecorder", text: "forwardUnique(frame)"},
@@ -810,9 +820,9 @@
           {from: "LocalAudioSpool", to: "BatchTransferManager", text: "spool_frames + range_sha256", dashed: true},
           {from: "BatchTransferManager", to: "AudioContinuityGuard", text: "reconcileRealtimeAndSpoolFrames()"},
           {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "unique_recovered_frames + remaining_gaps", dashed: true},
-          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "commitRecoveredFramesAndGaps()"},
-          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "ACK(committed_through_source_seq)"},
-          {from: "GlassCaptureAgent", to: "LocalAudioSpool", text: "deleteAckedRange()"}
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "transactionCommitRecoveredFramesManifestAndGaps()"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "ACK_AUDIO_RANGES(contiguous, selective, missing)"},
+          {from: "GlassCaptureAgent", to: "LocalAudioSpool", text: "deleteOnlyFullyAckedBlocks()"}
         ]
       },
       {
@@ -820,14 +830,14 @@
         title: "云端收齐屏障与版本化定稿",
         subtitle: "本地 seal 后强制上传预期分片；云端收齐才 final，超时缺片则 final_with_gaps，迟到分片触发新版本。",
         notes: [
-          "expected_sequences 来自已提交的最终 manifest，是云端判断完整性的唯一基准。",
+          "最终 manifest 以 binding CLOSE、expected_stream_ranges 和 missing_ranges 为完整性基准；UNKNOWN 尾边界不能输出无缺口 final。",
           "FinalizationCoordinator 可以异步等待网络；A0 隐私停止和下一次会话采集不被阻塞。",
           "在截止时间前收齐全部分片才输出 final；截止时间到仍缺失则显式输出 final_with_gaps(missing_ranges)。",
           "迟到分片不能静默覆盖旧结果，必须生成 transcript_version + 1，并保留旧版本和处理原因。"
         ],
         participants: ["AudioSessionManager", "ConversationRecorder", "EncryptedMediaStore", "FinalizationCoordinator", "UploadQueue", "IngestionService", "CloudCompletenessGate", "ConversationPipeline", "TextMemoryIndex"],
         blocks: [
-          {kind: "loop", from: 4, to: 8, label: "上传并核对 expected_sequences"},
+          {kind: "loop", from: 4, to: 8, label: "上传并核对 expected_stream_ranges"},
           {kind: "alt", from: 9, to: 13, label: "截止时间前全部收齐"},
           {kind: "else", from: 14, to: 17, label: "截止时间到仍有缺片"},
           {kind: "alt", from: 18, to: 22, label: "final_with_gaps 后收到迟到分片"}
@@ -835,12 +845,12 @@
         steps: [
           {from: "AudioSessionManager", to: "ConversationRecorder", text: "stopConversation(end_reason)"},
           {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "closeFinalChunk()"},
-          {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "commitFinalManifest(expected_sequences, known_missing)"},
+          {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "commitFinalManifest(binding_ids, expected_stream_ranges, known_missing)"},
           {from: "AudioSessionManager", to: "FinalizationCoordinator", text: "enqueueFinalize(conversation_id)"},
           {from: "FinalizationCoordinator", to: "UploadQueue", text: "forceFlushPendingChunksAndFinalManifest()"},
           {from: "UploadQueue", to: "EncryptedMediaStore", text: "readPendingByExpectedSequence()"},
           {from: "UploadQueue", to: "IngestionService", text: "idempotentUpload(chunks + final_manifest)"},
-          {from: "IngestionService", to: "CloudCompletenessGate", text: "registerAndCheck(expected_sequences, received_sequences)"},
+          {from: "IngestionService", to: "CloudCompletenessGate", text: "registerAndCheck(expected_stream_ranges, received_stream_ranges)"},
           {from: "CloudCompletenessGate", to: "IngestionService", text: "missing_sequences / complete", dashed: true},
           {from: "CloudCompletenessGate", to: "IngestionService", text: "complete"},
           {from: "IngestionService", to: "ConversationPipeline", text: "runFullASR(version=1, gaps=[])"},
@@ -860,12 +870,12 @@
       },
       {
         id: "source-fallback",
-        title: "异常恢复：音频源切换",
-        subtitle: "眼镜链路异常时临时切到手机麦克风，并用重叠音频对齐。",
+        title: "M3 可选扩展：独立 PHONE 音频源切换",
+        subtitle: "仅在能力协商启用 phone_mic_fallback 时创建独立 PHONE stream，并用 timeline segment 对齐。",
         notes: [
-          "这是鲁棒性图，可作为正式文档可选章节。",
-          "切换时保留 1-2 秒重叠，通过相关性对齐后去重。",
-          "时间线必须记录 source_history，避免后续证据定位混淆。"
+          "M3 默认可关闭自动手机麦克风兜底；关闭时眼镜链路缺失只写显式 missing_range。",
+          "启用后 PHONE 使用自己的 boot_id、stream_id 和 source_seq，绝不续用 GLASSES 序号。",
+          "切换时优先保留 1-2 秒重叠，通过相关性生成 AudioTimelineSegment；无重叠时标记时间质量降级。"
         ],
         participants: ["眼镜麦克风", "手机麦克风", "AudioSourceRouter", "ConversationRecorder", "AudioContinuityGuard", "EncryptedMediaStore"],
         blocks: [
@@ -876,18 +886,18 @@
           {from: "眼镜麦克风", to: "AudioSourceRouter", text: "audio_frame(source=glasses)"},
           {from: "AudioSourceRouter", to: "ConversationRecorder", text: "forward(frame)"},
           {from: "AudioSourceRouter", to: "ConversationRecorder", text: "markSourceSwitchStart()"},
-          {from: "AudioSourceRouter", to: "手机麦克风", text: "startFallbackMic()"},
-          {from: "手机麦克风", to: "AudioSourceRouter", text: "audio_frame(source=phone)"},
+          {from: "AudioSourceRouter", to: "手机麦克风", text: "startPhoneStream(new boot_id, stream_id, source_seq=0)"},
+          {from: "手机麦克风", to: "AudioSourceRouter", text: "audio_frame(source_kind=PHONE, independent_seq)"},
           {from: "AudioSourceRouter", to: "ConversationRecorder", text: "keepOverlap(1-2s)"},
           {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "alignByCorrelation(glasses_tail, phone_head)"},
           {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "aligned_offset_ms", dashed: true},
-          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeSourceHistory(glasses -> phone)"},
-          {from: "AudioSourceRouter", to: "眼镜麦克风", text: "resumeAudio()"},
-          {from: "眼镜麦克风", to: "AudioSourceRouter", text: "audio_frame(source=glasses)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeTimelineSegment(GLASSES -> PHONE, offset, uncertainty)"},
+          {from: "AudioSourceRouter", to: "眼镜麦克风", text: "resumeWithNewOrExistingGlassStream()"},
+          {from: "眼镜麦克风", to: "AudioSourceRouter", text: "audio_frame(source_kind=GLASSES, own_seq)"},
           {from: "AudioSourceRouter", to: "ConversationRecorder", text: "keepOverlap(1-2s)"},
           {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "alignByCorrelation(phone_tail, glasses_head)"},
           {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "aligned_offset_ms", dashed: true},
-          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeSourceHistory(phone -> glasses)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeTimelineSegment(PHONE -> GLASSES, offset, uncertainty)"},
           {from: "AudioSourceRouter", to: "手机麦克风", text: "stopFallbackMicAfterSwitchCommitted()"}
         ]
       }
@@ -1004,9 +1014,9 @@
         [/markMissingRanges/, "把缺失区间持久化，防止 ASR 或 LLM 在没有证据的时间段生成看似真实的内容。"],
         [/notifyConversationEnded/, "通知视觉层会话结束；如果没有手动或强场景触发，视觉应从 L1/L3 回到 L0。"],
         [/L1\/L3 -> L0/, "视觉层执行降级，关闭自动拍照，保护续航和隐私。"],
-        [/commitFinalManifest/, "先在手机本地提交包含 end_reason、expected_sequences 和 missing_ranges 的最终 manifest，再开始异步定稿。"],
+        [/commitFinalManifest/, "先在手机本地提交包含 binding IDs、expected_stream_ranges 和 missing_ranges 的最终 manifest，再开始异步定稿。"],
         [/forceFlushPendingChunksAndFinalManifest/, "强制上传最终 manifest 与所有待传分片，避免最后分片尚未到达云端就开始 ASR。"],
-        [/registerAndCheck|recheckAfterLateArrival/, "云端按 expected_sequences 检查是否收齐；迟到分片到达后重新判断并决定是否生成新版本。"],
+        [/registerAndCheck|recheckAfterLateArrival/, "云端按 expected_stream_ranges 检查是否收齐；迟到分片到达后重新判断并决定是否生成新版本。"],
         [/final_with_gaps|deadlineReached/, "截止时间仍缺片时显式定稿为 final_with_gaps，不让模型补写没有证据的区间。"],
         [/supersedes|final_revised/, "迟到分片触发版本化重处理，新结果引用被替代版本并保留处理原因。"],
         [/enter\(A1 listening\) \/ restart preroll/, "会话收尾后音频主状态回到 A1，并重新启动预录环，为下一段会话做准备。"],
@@ -1017,15 +1027,15 @@
         [/audio_frame\(source=glasses\)/, "眼镜麦克风作为主音频源持续输出帧，是最接近用户听觉视角的来源。"],
         [/forward\(frame\)/, "路由器把当前主音频源转发给录音器，录音器不需要关心具体来源。"],
         [/markSourceSwitchStart/, "记录音频源切换起点，后续时间线和证据要能标出来源变化。"],
-        [/startFallbackMic/, "眼镜链路异常时启动手机麦克风兜底，保证会话不断录。"],
-        [/audio_frame\(source=phone\)/, "手机麦克风开始输出兜底音频帧，音质和位置会不同，必须记录来源。"],
+        [/startPhoneStream/, "仅在能力协商允许时创建独立 PHONE stream；M3 默认可以关闭该扩展。"],
+        [/source_kind=PHONE/, "手机麦克风使用自己的 boot、stream 和 source_seq，不续接眼镜序号。"],
         [/keepOverlap/, "切换时保留 1-2 秒重叠音频，用于相关性对齐和去重，避免切换点漏字。"],
         [/alignByCorrelation\(glasses_tail, phone_head\)/, "用眼镜尾部和手机头部重叠音频做相关性对齐，计算时间偏移。"],
         [/alignByCorrelation\(phone_tail, glasses_head\)/, "眼镜恢复后同样用重叠音频对齐，避免手机源切回眼镜源时产生重复或断点。"],
         [/aligned_offset_ms/, "连续性检查器返回对齐偏移，录音器据此裁剪重叠并修正时间线。"],
-        [/writeSourceHistory\(glasses -> phone\)/, "记录从眼镜源切到手机源的历史，后续证据定位和质量评估会用到。"],
+        [/writeTimelineSegment\(GLASSES -> PHONE/, "记录眼镜源到手机源的时间线映射、偏移和不确定度。"],
         [/resumeAudio/, "眼镜恢复后重新启动眼镜音频源，但仍要经过重叠对齐才能切回主源。"],
-        [/writeSourceHistory\(phone -> glasses\)/, "记录从手机源切回眼镜源的历史，形成完整 source_history。"]
+        [/writeTimelineSegment\(PHONE -> GLASSES/, "记录手机源切回眼镜源的独立时间线段，不制造跨来源连续序号。"]
       ];
 
       const matched = rules.find(([pattern]) => pattern.test(text));
@@ -1053,7 +1063,7 @@
       if (/Spool|spool|source_seq|RealTimeAudio|Recovered|recovered/.test(text)) {
         return "影响：维持实时音频低延迟，并在断链后从眼镜 spool 去重补齐证据。";
       }
-      if (/expected_sequences|Completeness|complete|deadline|version|supersedes|LateChunks/.test(text)) {
+      if (/expected_stream_ranges|Completeness|complete|deadline|version|supersedes|LateChunks/.test(text)) {
         return "影响：等待云端收齐或显式以缺片状态定稿；迟到分片通过新版本修正结果。";
       }
       if (/upload|ack|Uploaded|Ingestion|ASR|Diarization|indexed|transcript_status|retry/.test(text)) {

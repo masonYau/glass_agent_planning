@@ -487,10 +487,10 @@
         tagClass: "phone",
         desc: "图像层级状态机。管理 L0/L1/L3、TTL、冷却和退出条件；向眼镜下发 schedule、burst 和 lease，不逐张发 takePhoto。"
       },
-      "VisualTriggerLLM": {
+      "VisualTriggerProvider": {
         device: "手机端",
         tagClass: "phone",
-        desc: "音频语义触发判断器。只输入手机端最近 10-20 秒粗转写、关键词和会话上下文，输出结构化 L3 建议。"
+        desc: "音频语义触发判断器。M3 使用关键词/规则，M4 可替换本地 LLM；只输出结构化 L3 建议。"
       },
       "CapturePolicyGate": {
         device: "策略门",
@@ -515,7 +515,7 @@
       "GlassCaptureAgent": {
         device: "眼镜端",
         tagClass: "glasses",
-        desc: "眼镜端采集执行器。安装手机下发的 L1/L3 策略和租约，在租约内用本地 timer 拍照，并执行批量发送、ACK 清理和自动降级。"
+        desc: "眼镜端采集执行器。安装带 control epoch/capture generation 的 L1/L3 租约，在本地 timer 拍照，并拦截隐私 fence 后的迟到回调。"
       },
       "Glass Camera": {
         device: "眼镜端",
@@ -540,7 +540,7 @@
       "LocalManifestStore": {
         device: "眼镜端",
         tagClass: "store",
-        desc: "眼镜本地 manifest。记录 capture_id、conversation_id、visual_level、sequence_no、时间戳、sha256 和 CAPTURED/GLASS_ACKED 状态。"
+        desc: "眼镜 SQLite 状态事实源。通过 journaled bundle 记录 attempt、capture_id、sha256、CAPTURED 和 ACK tombstone；JSONL 仅是导出视图。"
       },
       "BatchTransferManager": {
         device: "手机端",
@@ -592,8 +592,9 @@
         notes: [
           "L0 是视觉默认状态，不因为佩戴或 A1 监听自动拍照。",
           "A0、敏感地点、隐私日程和用户暂停必须立即强制 L0。",
-          "进入 L0 时要取消 L1/L3 定时器，关闭相机，并把未完成 burst 以隐私/策略事件收尾。",
-          "恢复后只回到 A1/L0；必须等 A2 started 后才允许自动 L1。"
+          "进入 L0 前先持久化 privacy lock 并递增 capture generation；旧 generation 的拍照回调不得提交。",
+          "进入 L0 时取消 L1/L3 定时器、关闭相机，并删除尚未 CAPTURED 的 staged 文件。",
+          "恢复必须引用 privacy_lock_id；只回到 A1/L0，必须等新的 A2 和新租约后才允许自动 L1。"
         ],
         participants: ["用户", "手机 App", "PrivacyPolicyGate", "AudioSessionManager", "VisualLevelScheduler", "CapturePolicyGate", "GlassCaptureAgent", "Glass Camera", "LocalVisualCache", "StatusIndicator"],
         blocks: [
@@ -604,17 +605,17 @@
           {from: "用户", to: "手机 App", text: "点击暂停 / 敏感地点 / 隐私日程命中"},
           {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluateVisualPrivacyContext()"},
           {from: "PrivacyPolicyGate", to: "手机 App", text: "visual_allowed = false", dashed: true},
-          {from: "手机 App", to: "AudioSessionManager", text: "enter(A0 private)"},
+          {from: "手机 App", to: "AudioSessionManager", text: "persistPrivacyLockAndEnterA0(capture_generation++)"},
           {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "forceLevel(L0 off)"},
           {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "revokeVisualCommands(reason=privacy)"},
           {from: "CapturePolicyGate", to: "GlassCaptureAgent", text: "stopAutoPhoto()"},
           {from: "GlassCaptureAgent", to: "Glass Camera", text: "powerDownCamera()"},
-          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "sealOpenCaptureAsPolicyGap()"},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "discardStagedOldGenerationAndRecordAttempt()"},
           {from: "VisualLevelScheduler", to: "StatusIndicator", text: "showVisualOff()"},
           {from: "用户", to: "手机 App", text: "恢复记录"},
           {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluateVisualPrivacyContext()"},
           {from: "PrivacyPolicyGate", to: "手机 App", text: "visual_allowed = true", dashed: true},
-          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "stay(L0) until A2 started"}
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "stay(L0) until explicit resume + new A2 lease"}
         ]
       },
       {
@@ -625,7 +626,8 @@
           "L1 的唯一默认自动入口是 A2 started，避免 A1 低功耗监听阶段采集图像。",
           "手机端只在进入、续租、撤销或降级时经过策略门，不为每张 L1 图片单独下发 takePhoto。",
           "眼镜端每次本地 tick 前检查 lease、缓存水位和本地硬约束；lease 过期或撤销后自动降 L0。",
-          "图片文件和 visual_manifest.jsonl 必须同事务写入，保证后续批量回传可校验。",
+          "图片使用 tmp+fsync+SQLite journaled bundle+rename 提交；JSONL 只从数据库导出，不能宣称与文件同事务。",
+          "attempt_no 和成功 sequence_no 在 device_id + boot_id 内单调递增；ACK 游标不能跨 boot。",
           "L1 只提供文本载体保底和事后 OCR 证据，不参与 L3 语义触发，也不做端侧完整 OCR。"
         ],
         participants: ["AudioSessionManager", "VisualLevelScheduler", "CapturePolicyGate", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "LocalVisualCache", "LocalManifestStore"],
@@ -646,8 +648,8 @@
           {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "localTimerTickIfLeaseValid(reason=l1_tick)"},
           {from: "GlassCaptureAgent", to: "Glass Camera", text: "captureStill()"},
           {from: "Glass Camera", to: "GlassCaptureAgent", text: "jpg + sensor_metadata", dashed: true},
-          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeImageFile(capture_id.jpg)"},
-          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendVisualManifest(level=L1, sequence_no)"},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeTmpAndFsync(capture_id.tmp)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "journaledBundleCommit(CAPTURED, sha256, attempt_no)"},
           {from: "GlassCaptureAgent", to: "VisualLevelScheduler", text: "heartbeat(level=L1, last_capture_id, lease_left)", dashed: true},
           {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "renewOrRevokeLeaseOnPolicyTick()"},
           {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "renewLease or revoke/downgrade(reason)", dashed: true},
@@ -661,10 +663,10 @@
         notes: [
           "L3 的唯一自动语义入口是手机端最近 10-20 秒粗转写或关键词，不依赖图像及时回传。",
           "触发输入包含 audio_state、recent_transcript、conversation_context；预算和隐私由策略门读取实时值。",
-          "VisualTriggerLLM 输出 decision_id、should_trigger_l3、scene_type、confidence、ttl_seconds、reason_code。",
+          "VisualTriggerProvider 输出 decision_id、should_trigger_l3、scene_type、confidence、ttl_seconds、reason_code；M3 实现为关键词规则。",
           "无论模型是否建议升级，最终都必须由 CapturePolicyGate 给出 allow/deny，并记录决策事件。"
         ],
-        participants: ["AudioSessionManager", "LowLatencyTranscriptProvider", "VisualTriggerLLM", "CapturePolicyGate", "VisualLevelScheduler", "LocalManifestStore"],
+        participants: ["AudioSessionManager", "LowLatencyTranscriptProvider", "VisualTriggerProvider", "CapturePolicyGate", "VisualLevelScheduler", "LocalManifestStore"],
         blocks: [
           {kind: "loop", from: 0, to: 9, label: "A2/L1 期间滚动构造音频语义输入"},
           {kind: "alt", from: 4, to: 6, label: "语义命中且策略允许"},
@@ -673,8 +675,8 @@
         steps: [
           {from: "AudioSessionManager", to: "LowLatencyTranscriptProvider", text: "publishRecentAudioWindow(10-20s)"},
           {from: "LowLatencyTranscriptProvider", to: "LowLatencyTranscriptProvider", text: "incrementalASRAndKeywords()"},
-          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerLLM", text: "recent_transcript + keyword_hits + audio_state"},
-          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "decision(decision_id, should_trigger_l3, confidence, ttl, reason)"},
+          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerProvider", text: "recent_transcript + keyword_hits + audio_state"},
+          {from: "VisualTriggerProvider", to: "CapturePolicyGate", text: "ruleDecision(decision_id, should_trigger_l3, confidence, ttl, reason)"},
           {from: "CapturePolicyGate", to: "CapturePolicyGate", text: "evaluate privacy/power/budget/cooldown"},
           {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(decision_id, ttl, burst_expire_at)", dashed: true},
           {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendTriggerDecisionEvent(allowed, reason, confidence)"},
@@ -696,14 +698,14 @@
           "质量守卫只打标签，不擅自删除原始证据；真正的 OCR 质量判断在云端完成。",
           "L3 到期优先回 L1；如果 L1 lease 无效、A2 已结束、隐私禁拍或硬约束触发，则直接回 L0。"
         ],
-        participants: ["VisualTriggerLLM", "CapturePolicyGate", "VisualLevelScheduler", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "ImageQualityGuard", "LocalVisualCache", "LocalManifestStore"],
+        participants: ["VisualTriggerProvider", "CapturePolicyGate", "VisualLevelScheduler", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "ImageQualityGuard", "LocalVisualCache", "LocalManifestStore"],
         blocks: [
           {kind: "alt", from: 0, to: 7, label: "策略门批准 L3 并签发过期时间与 burst 租约"},
           {kind: "loop", from: 8, to: 18, label: "眼镜端未过期且租约有效时每 1 秒本地拍照"},
           {kind: "else", from: 19, to: 23, label: "过期、撤销或本地中止后回落"}
         ],
         steps: [
-          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "should_trigger_l3=true, reason=screen_or_paper_text"},
+          {from: "VisualTriggerProvider", to: "CapturePolicyGate", text: "should_trigger_l3=true, reason=screen_or_paper_text"},
           {from: "CapturePolicyGate", to: "PowerThermalMonitor", text: "readLiveLimits()"},
           {from: "PowerThermalMonitor", to: "CapturePolicyGate", text: "battery + thermal + l3_budget_left", dashed: true},
           {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl=20s, burst_expire_at, budget_token, lease_ttl=25s)"},
@@ -711,13 +713,13 @@
           {from: "GlassCaptureAgent", to: "StatusIndicator", text: "showBurstActive()"},
           {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendLevelEnter(level=L3, burst_expire_at, budget_token)"},
           {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "scheduleLocalExpiryTimer(burst_expire_at, fallback=L1)"},
-          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "checkBurstExpiryAndLocalAbort(expire_at, lease, battery, thermal, cache)"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "checkExpiryLeaseGenerationPrivacyAndLocalAbort()"},
           {from: "GlassCaptureAgent", to: "Glass Camera", text: "captureStill()"},
           {from: "Glass Camera", to: "GlassCaptureAgent", text: "jpg + exposure_metadata", dashed: true},
           {from: "GlassCaptureAgent", to: "ImageQualityGuard", text: "quickCheck(blur/exposure/fingerprint)"},
           {from: "ImageQualityGuard", to: "GlassCaptureAgent", text: "quality_tag", dashed: true},
-          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeImageFile(capture_id.jpg)"},
-          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendVisualManifest(level=L3, trigger_reason)"},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeTmpAndFsync(capture_id.tmp)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "journaledBundleCommit(CAPTURED, trigger_reason, attempt_no)"},
           {from: "GlassCaptureAgent", to: "VisualLevelScheduler", text: "burstHeartbeat(sequence_no, remaining_ttl, burst_expire_at)", dashed: true},
           {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "consumeBudgetAndRecheck(heartbeat)"},
           {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "continue / renewBurstLease(no_extend_expiry) / revokeToL1", dashed: true},
@@ -751,8 +753,8 @@
         steps: [
           {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "BLE sendBatchRequest(batch_window)"},
           {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "establishP2P()"},
-          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listPendingVisualManifest(status=CAPTURED, last_ack_cursor)"},
-          {from: "LocalManifestStore", to: "BatchTransferManager", text: "visual_manifest.jsonl", dashed: true},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listPending(status=CAPTURED, contiguous + selective ACK)"},
+          {from: "LocalManifestStore", to: "BatchTransferManager", text: "manifest export rebuilt from SQLite", dashed: true},
           {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "beginTransaction(manifest)"},
           {from: "BatchTransferManager", to: "LocalVisualCache", text: "requestFile(capture_id)"},
           {from: "LocalVisualCache", to: "BatchTransferManager", text: "image bytes", dashed: true},
@@ -840,7 +842,8 @@
           "降级是策略结果，不是设备异常自由发挥：L3 可降 L1，L1 可降 L0。",
           "任何降级都要写 manifest 事件，方便后续解释缺图区间。",
           "手机失联时眼镜继续缓存，但缓存高水位可以进一步降级到 L0。",
-          "恢复后从 last_ack_cursor 补传，不能重新编号或覆盖旧 capture_id。"
+          "恢复后从 contiguous ACK + selective ACK + missing ranges 补传，不能重新编号或覆盖旧 capture_id。",
+          "重连后旧租约不自动恢复；手机重同步状态并签发新 lease 后才能从 L0 升级。"
         ],
         participants: ["PowerThermalMonitor", "NetworkLinkMonitor", "CapturePolicyGate", "VisualLevelScheduler", "GlassCaptureAgent", "Glass Camera", "LocalManifestStore", "BatchTransferManager", "手机 App"],
         blocks: [
@@ -856,11 +859,11 @@
           {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendDegradeEvent(reason, level_before, level_after)"},
           {from: "VisualLevelScheduler", to: "手机 App", text: "showDegradedReason()", dashed: true},
           {from: "NetworkLinkMonitor", to: "BatchTransferManager", text: "reconnectDetected()"},
-          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "requestPendingFromLastAck()"},
-          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listAfterAckCursor()"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "requestPendingFromAckRanges()"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listNotCoveredByContiguousOrSelectiveAck()"},
           {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "resumeBatchTransfer()"},
           {from: "BatchTransferManager", to: "CapturePolicyGate", text: "reportCacheRecovered()"},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "restoreAllowedLevelOnNextTick()", dashed: true}
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "issueNewLeaseAfterStateResync()", dashed: true}
         ]
       }
     ];
@@ -913,12 +916,12 @@
       const rules = [
         [/forceLevel\(L0|stopAutoPhoto|powerDownCamera|visual_allowed = false/, "关闭自动视觉采集，确保隐私和策略状态立即生效。"],
         [/notifyA2Started|requestLevel\(L1|installL1Schedule|renewLease/, "从正式会话进入 L1 保底视觉采样，并把节拍与租约安装到眼镜端。"],
-        [/localTimerTickIfLeaseValid|burstTimerTickIfTtlAndLeaseValid|captureStill|writeImageFile|appendVisualManifest/, "眼镜端在有效租约内本地执行一次静态图采集，并把文件与 manifest 绑定成可校验证据。"],
+        [/localTimerTickIfLeaseValid|captureStill|writeTmpAndFsync|journaledBundleCommit/, "眼镜端在有效租约与 capture generation 内采集静态图，并通过 journaled bundle 提交可恢复证据。"],
         [/recent_transcript|publishRecentAudioWindow|incrementalASRAndKeywords|decision\(decision_id/, "仅用手机端最近 10-20 秒音频语义构造 L3 候选，不依赖 L1 图片及时回传。"],
         [/allowL3|startBurst|burst_expire_at|consumeBudget|downgrade|revokeToL1|returnToInstalledL1Schedule/, "推进 L3 短 burst，并持续受过期时间、租约、预算、温度和冷却约束。"],
         [/sendBatchRequest|establishP2P|PHONE_COMMITTED|ACK1|ACK2|CLOUD_ACKED|deleteAckedFile/, "推进四级持久化状态；手机事务提交后才能 ACK1，云端 ACK2 失败只由手机副本重试。"],
         [/runOCR|Layout|Quality|writeEvidence|TextMemoryIndex/, "把图片序列转成可检索文本，并保留质量标签和证据坐标。"],
-        [/battery_low|thermal_high|cache_near_full|recomputeMaxAllowedLevel|restoreAllowedLevel/, "处理异常降级和恢复，保证每个状态变化都有可解释原因。"]
+        [/battery_low|thermal_high|cache_near_full|recomputeMaxAllowedLevel|issueNewLeaseAfterStateResync/, "处理异常降级；恢复时完成状态重同步并签发新租约，不自动复用旧授权。"]
       ];
       const matched = rules.find(([pattern]) => pattern.test(text));
       if (matched) return matched[1];
