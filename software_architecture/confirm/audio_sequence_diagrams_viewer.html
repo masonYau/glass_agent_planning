@@ -1,0 +1,1328 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>音频采集 UML 时序图审核器</title>
+  <style>
+    :root {
+      --bg: #f5f7f6;
+      --surface: #ffffff;
+      --surface-2: #eef3f0;
+      --ink: #17211d;
+      --muted: #62716a;
+      --line: #d8e0dc;
+      --green: #146b4c;
+      --blue: #2e5f9f;
+      --amber: #946716;
+      --red: #9f3f31;
+      --shadow: 0 18px 46px rgba(22, 33, 29, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(20, 107, 76, 0.08), transparent 340px),
+        var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .shell {
+      max-width: 1480px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+
+    .title-block p {
+      margin: 5px 0 0;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: var(--green);
+    }
+
+    .dot.phone {
+      background: var(--blue);
+    }
+
+    .dot.cloud {
+      background: var(--amber);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .diagram-panel,
+    .side-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .diagram-panel {
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .diagram-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfb;
+    }
+
+    .current h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .current p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 6px;
+      min-height: 30px;
+      padding: 4px 9px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: var(--surface-2);
+    }
+
+    .btn.primary {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+
+    .zoom-label {
+      min-width: 50px;
+      text-align: right;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .range {
+      width: 130px;
+      accent-color: var(--green);
+    }
+
+    .viewport {
+      height: calc(100vh - 146px);
+      min-height: 560px;
+      overflow: auto;
+      cursor: grab;
+      background:
+        linear-gradient(90deg, rgba(216, 224, 220, 0.38) 1px, transparent 1px),
+        linear-gradient(rgba(216, 224, 220, 0.38) 1px, transparent 1px),
+        #fbfcfb;
+      background-size: 28px 28px;
+    }
+
+    .viewport.dragging {
+      cursor: grabbing;
+      user-select: none;
+    }
+
+    .svg-wrap {
+      transform-origin: 0 0;
+      padding: 28px;
+    }
+
+    svg {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .side-panel {
+      min-height: calc(100vh - 88px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .selector {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfb;
+    }
+
+    .selector h2,
+    .notes h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .diagram-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .diagram-tab {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      padding: 9px 10px;
+      cursor: pointer;
+    }
+
+    .diagram-tab[aria-pressed="true"] {
+      border-color: var(--green);
+      background: #eaf5ee;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .diagram-tab span {
+      display: block;
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .notes {
+      padding: 14px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .note-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .note-list li {
+      margin: 6px 0;
+    }
+
+    .flow-tooltip {
+      position: fixed;
+      z-index: 20;
+      width: min(360px, calc(100vw - 28px));
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 16px 42px rgba(22, 33, 29, 0.18);
+      color: var(--ink);
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(10px, 10px);
+      transition: opacity 120ms ease;
+    }
+
+    .flow-tooltip.visible {
+      opacity: 1;
+    }
+
+    .flow-tooltip h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--green);
+    }
+
+    .flow-tooltip p {
+      margin: 6px 0;
+      color: var(--muted);
+    }
+
+    .flow-tooltip strong {
+      color: var(--ink);
+    }
+
+    .device-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--green);
+    }
+
+    .device-tag.phone {
+      background: var(--blue);
+    }
+
+    .device-tag.cloud {
+      background: var(--amber);
+    }
+
+    .device-tag.user {
+      background: var(--muted);
+    }
+
+    .device-tag.store {
+      background: #566a5f;
+    }
+
+    @media (max-width: 1040px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        min-height: auto;
+      }
+
+      .viewport {
+        height: 620px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        padding: 12px;
+      }
+
+      .topbar,
+      .diagram-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .legend,
+      .zoom-controls {
+        justify-content: flex-start;
+      }
+
+      .range {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="title-block">
+        <h1>音频采集 UML 时序图审核器</h1>
+        <p>左侧图可缩放和拖拽；悬停图中流程或模块查看说明。</p>
+      </div>
+      <div class="legend" aria-label="部署设备图例">
+        <span class="badge"><span class="dot"></span>眼镜端</span>
+        <span class="badge"><span class="dot phone"></span>手机端</span>
+        <span class="badge"><span class="dot cloud"></span>云端</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <section class="diagram-panel" aria-label="缩放时序图">
+        <div class="diagram-toolbar">
+          <div class="current">
+            <h2 id="diagramTitle">A0 Private 隐私暂停</h2>
+            <p id="diagramSubtitle">暂停时强制停止音频预录，并通知视觉进入 L0。</p>
+          </div>
+          <div class="zoom-controls" aria-label="缩放控制">
+            <button class="btn" id="zoomOut" type="button">-</button>
+            <input class="range" id="zoomRange" type="range" min="55" max="180" value="100" aria-label="缩放比例">
+            <button class="btn" id="zoomIn" type="button">+</button>
+            <button class="btn primary" id="fitBtn" type="button">适配</button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
+          </div>
+        </div>
+        <div class="viewport" id="viewport">
+          <div class="svg-wrap" id="svgWrap"></div>
+        </div>
+        <div class="flow-tooltip" id="flowTooltip" role="tooltip" aria-hidden="true"></div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="selector">
+          <h2>选择音频层级图</h2>
+          <div class="diagram-list" id="diagramList"></div>
+        </section>
+
+        <section class="notes">
+          <h2>当前图审核点</h2>
+          <ul class="note-list" id="reviewNotes"></ul>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const modules = {
+      "用户": {
+        device: "用户",
+        tagClass: "user",
+        desc: "手动暂停、恢复、开始记录，或通过真实行为触发会话。用户动作优先级最高。"
+      },
+      "手机 App": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "用户入口和后台主控。接收隐私设置、状态展示，并协调音频状态机、视觉状态机和传输任务。"
+      },
+      "手机后台服务": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "维持 A1/A2 采集循环，接收眼镜音频帧，连接 VAD、预录缓存和会话检测。"
+      },
+      "PrivacyPolicyGate": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "隐私策略门。根据用户暂停、敏感地点、日程和策略配置，决定是否允许保存原始音频。"
+      },
+      "CapturePolicyGate": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "确定性策略门。检查隐私、电量、温度、冷却和预算，避免模型或规则误触发导致越权采集。"
+      },
+      "AudioSessionManager": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "音频状态机主控。管理 A0/A1/A2，创建会话 ID，固化预录，并通知视觉层进入或退出 L1。"
+      },
+      "GlassCaptureAgent": {
+        device: "眼镜端",
+        tagClass: "glasses",
+        desc: "眼镜端采集执行器。响应手机命令，启动/停止音频，执行拍照和批量文件发送。"
+      },
+      "Glass Mic": {
+        device: "眼镜端",
+        tagClass: "glasses",
+        desc: "眼镜麦克风硬件或 SDK 音频入口。优先作为近场会话音频来源。"
+      },
+      "眼镜麦克风": {
+        device: "眼镜端",
+        tagClass: "glasses",
+        desc: "眼镜麦克风音频源。负责输出靠近用户视角的音频帧。"
+      },
+      "手机麦克风": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "兜底音频源。眼镜低电、过热或链路不稳定时接管录音，但需要在时间线上标明来源切换。"
+      },
+      "LowPowerVAD": {
+        device: "手机端优先，可下沉眼镜端",
+        tagClass: "phone",
+        desc: "低功耗人声检测。首版建议放手机端；若眼镜 SDK 支持稳定低功耗 VAD，可下沉到眼镜端减少音频链路压力。"
+      },
+      "PreRollAudioBuffer": {
+        device: "手机端优先，可选眼镜端",
+        tagClass: "phone",
+        desc: "60-120 秒加密预录环形缓存。用于补齐自动检测晚于会话开头的问题。"
+      },
+      "ConversationDetector": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "会话检测器。融合持续人声、多说话人、日程和上下文，判断是否从 A1 进入 A2，或是否结束会话。"
+      },
+      "ConversationRecorder": {
+        device: "手机端优先",
+        tagClass: "phone",
+        desc: "会话录音和切片模块。负责编码、60 秒分片、序号、时间戳、样本数和校验和。眼镜支持本地长录时可下沉。"
+      },
+      "EncryptedMediaStore": {
+        device: "手机端",
+        tagClass: "store",
+        desc: "手机加密媒体库。保存音频分片、manifest、上传状态和缺失区间。"
+      },
+      "AudioContinuityGuard": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "连续性检查器。检查序号、样本数、时间范围、缺片、重复和音频源切换对齐。"
+      },
+      "VisualLevelScheduler": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "视觉等级调度器。受音频状态托底：A0 强制 L0，A2 默认 L1，L3 必须经过语义触发和策略批准。"
+      },
+      "UploadQueue": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "常规上传队列。按 5-10 分钟或网络/电量条件批量上传完整音频分片，失败后幂等重试。"
+      },
+      "SceneProbeScheduler": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "A2 启动后的场景探测调度器。只负责 30 秒一次性探测任务的启动、取消、超时和轻量重试，不改变正式录音分片规则。"
+      },
+      "SceneProbeUploader": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "高优先级小包上传器。读取 A2 前 30 秒探测音频和最小 manifest，用于快速判断会话场景；失败时保持 L1，不阻塞录音。"
+      },
+      "QuickASRSceneClassifier": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "快速 ASR 和场景分类服务。把 30 秒探测音频转成粗文本与场景候选，输出结构化置信度给策略门。"
+      },
+      "VisualTriggerLLM": {
+        device: "手机端或云端",
+        tagClass: "phone",
+        desc: "视觉触发判断器。可由规则、轻量模型或 LLM 实现，只输出是否建议升级 L3，不能直接控制相机。"
+      },
+      "IngestionService": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "云端接入服务。接收 manifest、音频分片和缺失区间，做幂等校验并触发后续 ASR。"
+      },
+      "ConversationPipeline": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "完整 ASR 管线。负责音频拼接、转写、说话人分离、标点和时间戳。"
+      },
+      "TextMemoryIndex": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "文本记忆索引。保存逐字稿、音频证据位置，并支持后续检索和问答。"
+      },
+      "AudioSourceRouter": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "音频源路由。负责眼镜麦克风、眼镜本地录音和手机麦克风之间的切换、重叠和去重。"
+      }
+    };
+
+    const diagrams = [
+      {
+        id: "a0-private",
+        title: "A0 Private 隐私暂停",
+        subtitle: "暂停时强制停止音频预录，并通知视觉进入 L0。",
+        notes: [
+          "A0 是硬隐私状态，必须优先于所有自动检测。",
+          "进入 A0 后清空或停止预录环，不保存原始音频。",
+          "A0 会强制视觉进入 L0，避免音频暂停但相机继续工作的错配。",
+          "如果 A2 中途进入 A0，需要关闭当前分片并写入 privacy_gap，恢复后不能补录缺口。"
+        ],
+        participants: ["用户", "手机 App", "PrivacyPolicyGate", "AudioSessionManager", "ConversationRecorder", "EncryptedMediaStore", "GlassCaptureAgent", "PreRollAudioBuffer", "VisualLevelScheduler"],
+        blocks: [
+          {kind: "alt", from: 4, to: 5, label: "如果当前处于 A2"},
+          {kind: "loop", from: 10, to: 11, label: "A0 持续期间：不采集原始音频"}
+        ],
+        steps: [
+          {from: "用户", to: "手机 App", text: "点击暂停 / 敏感地点 / 隐私日程命中"},
+          {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluatePrivacyContext()"},
+          {from: "PrivacyPolicyGate", to: "手机 App", text: "recording_allowed = false", dashed: true},
+          {from: "手机 App", to: "AudioSessionManager", text: "enter(A0 private)"},
+          {from: "AudioSessionManager", to: "ConversationRecorder", text: "closeActiveChunkIfA2()"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writePrivacyGapIfA2(start_ms, end_ms)"},
+          {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "clearAndStop()"},
+          {from: "AudioSessionManager", to: "GlassCaptureAgent", text: "stopAudioCapture()"},
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "forceLevel(L0 off)"},
+          {from: "手机 App", to: "用户", text: "显示录音已暂停", dashed: true},
+          {from: "GlassCaptureAgent", to: "AudioSessionManager", text: "不发送原始音频", dashed: true},
+          {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "不写入预录环", dashed: true},
+          {from: "用户", to: "手机 App", text: "恢复记录"},
+          {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluatePrivacyContext()"},
+          {from: "PrivacyPolicyGate", to: "手机 App", text: "recording_allowed = true", dashed: true},
+          {from: "手机 App", to: "AudioSessionManager", text: "enter(A1 listening)"},
+          {from: "AudioSessionManager", to: "GlassCaptureAgent", text: "startLowPowerAudio()"},
+          {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "startEncryptedRingBuffer(60-120s)"}
+        ]
+      },
+      {
+        id: "a1-listening",
+        title: "A1 Listening 低功耗监听",
+        subtitle: "默认佩戴状态下用 VAD 和预录环为 A2 会话做准备。",
+        notes: [
+          "A1 不生成正式会话，只维护短预录。",
+          "VAD 负责低功耗人声检测，ConversationDetector 决定是否进入 A2。",
+          "预录环建议手机端优先，眼镜本地低功耗录音成熟后可下沉。"
+        ],
+        participants: ["Glass Mic", "手机后台服务", "LowPowerVAD", "PreRollAudioBuffer", "ConversationDetector", "CapturePolicyGate"],
+        blocks: [
+          {kind: "loop", from: 2, to: 7, label: "默认佩戴状态 A1"},
+          {kind: "alt", from: 8, to: 9, label: "未达到会话阈值"},
+          {kind: "else", from: 10, to: 10, label: "持续人声 3-5 秒"}
+        ],
+        steps: [
+          {from: "手机后台服务", to: "Glass Mic", text: "startLowPowerAudio()"},
+          {from: "手机后台服务", to: "PreRollAudioBuffer", text: "startEncryptedRingBuffer(60-120s)"},
+          {from: "Glass Mic", to: "手机后台服务", text: "low_power_audio_frame"},
+          {from: "手机后台服务", to: "LowPowerVAD", text: "detectVoice(frame)"},
+          {from: "手机后台服务", to: "PreRollAudioBuffer", text: "appendEncrypted(frame)"},
+          {from: "LowPowerVAD", to: "ConversationDetector", text: "voice_activity_score", dashed: true},
+          {from: "ConversationDetector", to: "CapturePolicyGate", text: "checkPrivacyAndPower()"},
+          {from: "CapturePolicyGate", to: "ConversationDetector", text: "allow_audio_detection", dashed: true},
+          {from: "ConversationDetector", to: "手机后台服务", text: "keep A1 listening", dashed: true},
+          {from: "ConversationDetector", to: "手机后台服务", text: "requestEnterA2(trigger=voice)"}
+        ]
+      },
+      {
+        id: "a1-to-a2",
+        title: "A1 -> A2 会话触发",
+        subtitle: "检测到会话后固化预录，创建会话并启动完整录音。",
+        notes: [
+          "会话 ID 应在固化预录前生成，确保预录片段归属明确。",
+          "预录应从首个有效人声前约 2 秒开始，降低会话开头丢失。",
+          "进入 A2 后通知视觉层启用 L1，每分钟拍照保底。",
+          "A2 启动后同时调度 30 秒场景探测，和 5-10 分钟常规上传保持独立。"
+        ],
+        participants: ["ConversationDetector", "AudioSessionManager", "PreRollAudioBuffer", "ConversationRecorder", "EncryptedMediaStore", "VisualLevelScheduler", "SceneProbeScheduler", "UploadQueue"],
+        steps: [
+          {from: "ConversationDetector", to: "AudioSessionManager", text: "requestEnterA2(trigger, confidence)"},
+          {from: "AudioSessionManager", to: "AudioSessionManager", text: "createConversationId()"},
+          {from: "AudioSessionManager", to: "PreRollAudioBuffer", text: "freezeRange(first_voice - 2s, now)"},
+          {from: "PreRollAudioBuffer", to: "AudioSessionManager", text: "preroll_audio_segment", dashed: true},
+          {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "persistPreroll(conversation_id, segment)"},
+          {from: "AudioSessionManager", to: "ConversationRecorder", text: "startConversation(conversation_id)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeAudioManifest(sequence_no=0, type=preroll)"},
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "notifyA2Started(conversation_id)"},
+          {from: "VisualLevelScheduler", to: "AudioSessionManager", text: "L1 voice-scout enabled", dashed: true},
+          {from: "AudioSessionManager", to: "SceneProbeScheduler", text: "scheduleInitialProbe(+30s)"},
+          {from: "SceneProbeScheduler", to: "AudioSessionManager", text: "probe_scheduled", dashed: true},
+          {from: "AudioSessionManager", to: "UploadQueue", text: "scheduleBatchUpload(5-10min)"}
+        ]
+      },
+      {
+        id: "a2-recording",
+        title: "A2 Conversation 会话录音",
+        subtitle: "完整会话期间持续编码，60 秒切片并检查连续性。",
+        notes: [
+          "60 秒切片降低单文件损坏风险，也便于缺片定位。",
+          "AudioContinuityGuard 不做 ASR，只检查序号、样本数、时间范围和校验。",
+          "正常音频也统一经过 AudioSourceRouter，后续切到手机麦克风时不改主链路。",
+          "上传窗口可以 5-10 分钟批量，弱网时只缓存并写 retry 状态，不阻塞录音。"
+        ],
+        participants: ["Glass Mic", "AudioSourceRouter", "ConversationRecorder", "EncryptedMediaStore", "AudioContinuityGuard", "UploadQueue", "IngestionService"],
+        blocks: [
+          {kind: "loop", from: 0, to: 13, label: "A2 会话进行中"},
+          {kind: "alt", from: 4, to: 9, label: "当前分片达到 60 秒"},
+          {kind: "alt", from: 10, to: 13, label: "到达 5-10 分钟上传窗口"}
+        ],
+        steps: [
+          {from: "Glass Mic", to: "AudioSourceRouter", text: "audio_frame(source=glasses, timestamp, samples)"},
+          {from: "AudioSourceRouter", to: "ConversationRecorder", text: "forward(frame)"},
+          {from: "ConversationRecorder", to: "ConversationRecorder", text: "encode(Opus/LC3)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "appendToCurrentChunk()"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "closeChunk(sequence_no, start_ms, end_ms, sample_count, sha256)"},
+          {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "verifyChunkContinuity(sequence_no)"},
+          {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "continuity_ok / gap_detected", dashed: true},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "persistGapEventIfNeeded(gap_range)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeAudioManifest(chunk_meta)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "openNextChunk(sequence_no + 1)"},
+          {from: "UploadQueue", to: "EncryptedMediaStore", text: "readAudioManifest(status=pending/retry)"},
+          {from: "UploadQueue", to: "IngestionService", text: "uploadManifestAndChunks()"},
+          {from: "IngestionService", to: "UploadQueue", text: "ack / partial_ack / retry_after", dashed: true},
+          {from: "UploadQueue", to: "EncryptedMediaStore", text: "markUploadedOrRetry()"}
+        ]
+      },
+      {
+        id: "a2-finalize",
+        title: "A2 结束与 ASR 定稿",
+        subtitle: "结束会话后关闭最后分片，校验时间线并触发云端完整转写。",
+        notes: [
+          "结束不能只依赖短静音，建议先进入 EndPending，再由 60-120 秒静音加上下文结束确认。",
+          "EndPending 期间如果人声恢复，需要取消结束候选并回到 Active。",
+          "缺片必须显式写入 missing_ranges，不能由模型补写。",
+          "视觉层收到会话结束后，如没有其他触发应回到 L0，音频主状态回到 A1。"
+        ],
+        participants: ["ConversationDetector", "AudioSessionManager", "ConversationRecorder", "AudioContinuityGuard", "EncryptedMediaStore", "VisualLevelScheduler", "IngestionService", "ConversationPipeline", "TextMemoryIndex"],
+        blocks: [
+          {kind: "alt", from: 1, to: 1, label: "EndPending 期间人声恢复"},
+          {kind: "alt", from: 6, to: 6, label: "时间线完整"},
+          {kind: "else", from: 7, to: 8, label: "存在缺片"}
+        ],
+        steps: [
+          {from: "ConversationDetector", to: "AudioSessionManager", text: "enterEndPending(silence_60_120s + context_end)"},
+          {from: "ConversationDetector", to: "AudioSessionManager", text: "voice_resumed -> cancelEndPending()", dashed: true},
+          {from: "ConversationDetector", to: "AudioSessionManager", text: "requestFinalize(reason=auto/manual/privacy/low_power)"},
+          {from: "AudioSessionManager", to: "ConversationRecorder", text: "stopConversation()"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "closeFinalChunk()"},
+          {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "verifyFullTimeline(conversation_id)"},
+          {from: "AudioContinuityGuard", to: "AudioSessionManager", text: "timeline_ok(missing_ranges=[])", dashed: true},
+          {from: "AudioContinuityGuard", to: "AudioSessionManager", text: "missing_ranges", dashed: true},
+          {from: "AudioSessionManager", to: "EncryptedMediaStore", text: "markMissingRanges(missing_ranges)"},
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "notifyConversationEnded()"},
+          {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "L1/L3 -> L0 if no other trigger"},
+          {from: "AudioSessionManager", to: "IngestionService", text: "finalizeConversation(manifest, chunks, missing_ranges)"},
+          {from: "IngestionService", to: "ConversationPipeline", text: "runFullASRAndDiarization()"},
+          {from: "ConversationPipeline", to: "TextMemoryIndex", text: "saveTranscriptSegmentsWithAudioEvidence()"},
+          {from: "TextMemoryIndex", to: "IngestionService", text: "indexed", dashed: true},
+          {from: "IngestionService", to: "AudioSessionManager", text: "transcript_status = final / final_with_gaps", dashed: true},
+          {from: "AudioSessionManager", to: "AudioSessionManager", text: "enter(A1 listening) / restart preroll"}
+        ]
+      },
+      {
+        id: "scene-probe-l3",
+        title: "30 秒场景探测与 L3 升级",
+        subtitle: "A2 启动后用一次高优先级小包判断场景，成功才经过策略门升级视觉。",
+        notes: [
+          "这是重度闭环图：30 秒探测独立于 60 秒正式分片和 5-10 分钟常规上传。",
+          "探测音频只用于快速 ASR/场景分类，失败、超时或策略拒绝都保持 L1。",
+          "L3 仍必须经过 CapturePolicyGate，LLM 或分类器不能直接控制相机。",
+          "A2 已结束、进入 A0 或隐私策略变化时，需要取消尚未完成的探测任务。"
+        ],
+        participants: ["AudioSessionManager", "SceneProbeScheduler", "ConversationRecorder", "EncryptedMediaStore", "SceneProbeUploader", "IngestionService", "QuickASRSceneClassifier", "CapturePolicyGate", "VisualLevelScheduler"],
+        blocks: [
+          {kind: "loop", from: 0, to: 16, label: "A2 初始 30 秒场景探测"},
+          {kind: "alt", from: 5, to: 13, label: "探测成功且策略通过"},
+          {kind: "else", from: 14, to: 15, label: "上传失败 / 超时 / 策略拒绝"}
+        ],
+        steps: [
+          {from: "AudioSessionManager", to: "SceneProbeScheduler", text: "scheduleInitialProbe(conversation_id, delay=30s)"},
+          {from: "SceneProbeScheduler", to: "ConversationRecorder", text: "requestProbeWindow(0-30s, noChunkSplit)"},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "createProbeSegmentRef(start_ms, end_ms)"},
+          {from: "EncryptedMediaStore", to: "SceneProbeScheduler", text: "probe_segment_ref + sha256", dashed: true},
+          {from: "SceneProbeScheduler", to: "SceneProbeUploader", text: "enqueueHighPriorityProbe(ref)"},
+          {from: "SceneProbeUploader", to: "IngestionService", text: "uploadProbeAudioAndManifest(ref)"},
+          {from: "IngestionService", to: "QuickASRSceneClassifier", text: "quickASRAndSceneClassify()"},
+          {from: "QuickASRSceneClassifier", to: "IngestionService", text: "scene_candidate(transcript, type, confidence)", dashed: true},
+          {from: "IngestionService", to: "SceneProbeUploader", text: "probe_result / retry_after / timeout", dashed: true},
+          {from: "SceneProbeUploader", to: "AudioSessionManager", text: "publishSceneProbeResult(result)"},
+          {from: "AudioSessionManager", to: "CapturePolicyGate", text: "evaluateVisualUpgrade(result, power, privacy, budget)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl, reason) or keepL1(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "L1 -> L3 scene-burst(10-30s)"},
+          {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "L3 -> L1 when ttl/budget/cooldown ends"},
+          {from: "SceneProbeUploader", to: "EncryptedMediaStore", text: "markProbeUploadedOrRetry()"},
+          {from: "SceneProbeScheduler", to: "SceneProbeScheduler", text: "retryOnceOrKeepL1OnFailure()"},
+          {from: "AudioSessionManager", to: "SceneProbeScheduler", text: "cancelProbeIfA2EndedOrA0()"}
+        ]
+      },
+      {
+        id: "source-fallback",
+        title: "异常恢复：音频源切换",
+        subtitle: "眼镜链路异常时临时切到手机麦克风，并用重叠音频对齐。",
+        notes: [
+          "这是鲁棒性图，可作为正式文档可选章节。",
+          "切换时保留 1-2 秒重叠，通过相关性对齐后去重。",
+          "时间线必须记录 source_history，避免后续证据定位混淆。"
+        ],
+        participants: ["眼镜麦克风", "手机麦克风", "AudioSourceRouter", "ConversationRecorder", "AudioContinuityGuard", "EncryptedMediaStore"],
+        blocks: [
+          {kind: "alt", from: 2, to: 8, label: "眼镜低电 / 过热 / 链路不稳定"},
+          {kind: "alt", from: 9, to: 14, label: "眼镜恢复"}
+        ],
+        steps: [
+          {from: "眼镜麦克风", to: "AudioSourceRouter", text: "audio_frame(source=glasses)"},
+          {from: "AudioSourceRouter", to: "ConversationRecorder", text: "forward(frame)"},
+          {from: "AudioSourceRouter", to: "ConversationRecorder", text: "markSourceSwitchStart()"},
+          {from: "AudioSourceRouter", to: "手机麦克风", text: "startFallbackMic()"},
+          {from: "手机麦克风", to: "AudioSourceRouter", text: "audio_frame(source=phone)"},
+          {from: "AudioSourceRouter", to: "ConversationRecorder", text: "keepOverlap(1-2s)"},
+          {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "alignByCorrelation(glasses_tail, phone_head)"},
+          {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "aligned_offset_ms", dashed: true},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeSourceHistory(glasses -> phone)"},
+          {from: "AudioSourceRouter", to: "眼镜麦克风", text: "resumeAudio()"},
+          {from: "眼镜麦克风", to: "AudioSourceRouter", text: "audio_frame(source=glasses)"},
+          {from: "AudioSourceRouter", to: "ConversationRecorder", text: "keepOverlap(1-2s)"},
+          {from: "ConversationRecorder", to: "AudioContinuityGuard", text: "alignByCorrelation(phone_tail, glasses_head)"},
+          {from: "AudioContinuityGuard", to: "ConversationRecorder", text: "aligned_offset_ms", dashed: true},
+          {from: "ConversationRecorder", to: "EncryptedMediaStore", text: "writeSourceHistory(phone -> glasses)"}
+        ]
+      }
+    ];
+
+    const deviceColors = {
+      "眼镜端": "#146b4c",
+      "手机端": "#2e5f9f",
+      "云端": "#946716",
+      "用户": "#62716a",
+      "手机端优先，可下沉眼镜端": "#2e5f9f",
+      "手机端优先，可选眼镜端": "#2e5f9f",
+      "手机端优先": "#2e5f9f",
+      "手机端或云端": "#2e5f9f"
+    };
+
+    const state = {
+      currentDiagram: diagrams[0],
+      zoom: 1,
+      baseWidth: 1200,
+      baseHeight: 720
+    };
+
+    const diagramList = document.getElementById("diagramList");
+    const diagramTitle = document.getElementById("diagramTitle");
+    const diagramSubtitle = document.getElementById("diagramSubtitle");
+    const reviewNotes = document.getElementById("reviewNotes");
+    const svgWrap = document.getElementById("svgWrap");
+    const viewport = document.getElementById("viewport");
+    const zoomRange = document.getElementById("zoomRange");
+    const zoomLabel = document.getElementById("zoomLabel");
+    const flowTooltip = document.getElementById("flowTooltip");
+
+    function escapeXml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function getModule(name) {
+      return modules[name] || {
+        device: "待定",
+        tagClass: "store",
+        desc: "该模块尚未写入模块表，审核后可补充部署位置和职责。"
+      };
+    }
+
+    function explainFlow(step, diagram) {
+      const text = step.text;
+      const rules = [
+        [/点击暂停|敏感地点|隐私日程命中/, "这是 A0 的入口信号。用户主动暂停或上下文命中隐私规则时，后续所有自动采集都必须让位。"],
+        [/evaluatePrivacyContext/, "集中读取用户设置、地点、日程和企业/个人隐私策略，避免各模块各自判断导致口径不一致。"],
+        [/recording_allowed = false/, "隐私策略返回禁止采集。后续状态机必须停止保存原始音频，并关闭视觉自动采集。"],
+        [/recording_allowed = true/, "隐私策略重新放行。系统可以恢复 A1 低功耗监听，但不会自动补录 A0 期间内容。"],
+        [/enter\(A0 private\)/, "把音频主状态切到 A0。该状态是硬门禁，优先级高于 VAD、LLM、日程和手动以外的自动触发。"],
+        [/closeActiveChunkIfA2/, "如果暂停发生在 A2 中途，先关闭当前正式分片，避免隐私暂停前后的音频被写进同一个不可分割文件。"],
+        [/writePrivacyGapIfA2/, "把隐私暂停区间写入会话时间线，后续 ASR、检索和问答必须看到这段缺口，不能补录或推断。"],
+        [/clearAndStop/, "停止预录环并清理未固化的短缓存，确保隐私暂停后没有可恢复的原始音频残留。"],
+        [/stopAudioCapture/, "通知眼镜端停止麦克风采集或停止向手机传音频帧，降低隐私风险和功耗。"],
+        [/forceLevel\(L0 off\)/, "音频暂停时同步强制视觉进入 L0，避免出现不录音但仍自动拍照的状态错配。"],
+        [/显示录音已暂停/, "给用户明确反馈当前处于暂停状态，降低隐私控制的不确定感。"],
+        [/不发送原始音频/, "A0 持续期间眼镜不应向手机发送可恢复的原始音频，只允许保留必要状态心跳。"],
+        [/不写入预录环/, "A0 期间不维护预录缓存，防止恢复后把隐私时间段错误固化到会话。"],
+        [/恢复记录/, "用户显式恢复后才允许从 A0 回到 A1，自动规则不能自行越过这个恢复动作。"],
+        [/enter\(A1 listening\)/, "恢复到默认佩戴状态，只做低功耗监听和短预录，不生成正式会话。"],
+        [/startLowPowerAudio/, "启动眼镜低功耗音频源。首选眼镜麦克风，因为它更接近用户实际听到的对话。"],
+        [/startEncryptedRingBuffer/, "开启 60-120 秒加密环形缓存，用于补齐自动检测晚于会话开头的问题。"],
+        [/low_power_audio_frame/, "眼镜持续发送低功耗音频帧，手机用它做 VAD 和预录，不立即当作正式会话保存。"],
+        [/detectVoice/, "VAD 只判断是否有人声和持续时间，不做完整转写，目标是低功耗和低延迟。"],
+        [/appendEncrypted/, "把 A1 音频帧写入加密环形缓存。缓存会滚动覆盖，只有进入 A2 时才固化。"],
+        [/voice_activity_score/, "VAD 输出人声概率或能量分数，供会话检测器累计 3-5 秒触发条件。"],
+        [/checkPrivacyAndPower/, "进入 A2 前再次检查隐私和功耗，避免低电、过热或暂停状态下误启动完整录音。"],
+        [/allow_audio_detection/, "策略门返回是否允许继续做会话检测。虚线表示状态结果而非音频数据流。"],
+        [/keep A1 listening/, "人声证据不足或上下文不成立时继续 A1，避免把短噪声、电视声或路人声误判成会话。"],
+        [/requestEnterA2\(trigger=voice\)/, "检测到持续人声后请求进入 A2。真正切换由 AudioSessionManager 统一执行。"],
+        [/requestEnterA2\(trigger, confidence\)/, "会话检测器提交触发原因和置信度，便于后续审计误触发和调参。"],
+        [/createConversationId/, "先创建稳定会话 ID，后续预录、音频分片、视觉 L1/L3 图片都挂到同一会话下。"],
+        [/freezeRange/, "从首个有效人声前约 2 秒到当前时刻固化预录，降低会话开头丢字。"],
+        [/preroll_audio_segment/, "预录缓存返回可持久化音频片段。虚线表示数据返回，不是新采集。"],
+        [/persistPreroll/, "把预录片段写入加密媒体库，作为 sequence 0 或独立 preroll 片段进入完整时间线。"],
+        [/startConversation/, "启动正式会话录音。之后音频不再只是环形缓存，而是进入持久化分片链路。"],
+        [/writeAudioManifest\(sequence_no=0/, "为预录片段写 manifest，记录时间范围、序号和校验信息，方便完整性检查。"],
+        [/notifyA2Started/, "音频进入 A2 后通知视觉层：默认打开 L1 每分钟拍照，形成会话期间的视觉文字锚点。"],
+        [/L1 voice-scout enabled/, "视觉层确认 L1 已启用。虚线表示状态确认，不代表相机立即拍照。"],
+        [/scheduleInitialProbe|scheduleInitialProbe\(conversation_id, delay=30s\)/, "A2 启动后安排一次 30 秒场景探测，用于判断是否值得升级视觉策略。它和常规音频批量上传互不阻塞。"],
+        [/probe_scheduled/, "场景探测任务已登记。虚线表示调度确认，不代表已经上传音频。"],
+        [/scheduleBatchUpload/, "安排音频 5-10 分钟批量上传。上传不应阻塞录音，弱网时继续本地缓存。"],
+        [/audio_frame\(source=glasses, timestamp, samples\)/, "A2 中的正式音频帧统一进入音源路由，必须带来源、单调时间戳和样本信息，后续用于连续性校验。"],
+        [/audio_frame\(timestamp, samples\)/, "A2 中的正式音频帧，必须带单调时间戳和样本信息，后续用于连续性校验。"],
+        [/encode\(Opus\/LC3\)/, "把 PCM 或原始帧压缩成低码率音频，降低存储和传输成本。"],
+        [/appendToCurrentChunk/, "把编码后的音频追加到当前 60 秒分片，避免生成过多小文件。"],
+        [/closeChunk/, "分片达到 60 秒后关闭文件，并生成时间范围、样本数和 SHA-256。"],
+        [/verifyChunkContinuity/, "检查相邻分片的序号、时间范围和样本数，尽早发现缺片、重复或时间漂移。"],
+        [/continuity_ok|gap_detected/, "连续性检查返回结果。若有 gap，后续逐字稿必须显式标注缺失，不能让模型补写。"],
+        [/persistGapEventIfNeeded/, "一旦分片级连续性检查发现缺口，立即把 gap event 写入本地库，避免应用崩溃后只在最终校验阶段才知道缺片。"],
+        [/writeAudioManifest\(chunk_meta\)/, "把分片元数据写入 manifest，作为上传、重试和云端幂等校验的依据。"],
+        [/openNextChunk/, "打开下一个序号的音频分片，保证长会话可以持续录制而不依赖单个大文件。"],
+        [/readPendingAudioManifest|readAudioManifest/, "上传队列读取待上传 manifest，只选择已关闭且校验完成的分片，包含 pending 和 retry 状态。"],
+        [/uploadManifestAndChunks/, "按 manifest 上传音频分片。云端以序号和 SHA-256 做幂等去重。"],
+        [/ack\(uploaded_sequence_no\)/, "云端确认已收到并校验指定序号。手机收到 ACK 后才能更新本地上传状态。"],
+        [/ack \/ partial_ack \/ retry_after/, "云端可能返回全量成功、部分成功或建议重试。端侧要按序号更新状态，避免重复上传造成证据混乱。"],
+        [/markUploadedOrRetry|markUploaded/, "把已上传分片标记为完成，失败或部分成功的分片进入 retry_scheduled，后续可幂等续传。"],
+        [/enterEndPending/, "进入会话结束候选态。此时不立即停止录音，而是等待静音、上下文和策略条件稳定。"],
+        [/voice_resumed -> cancelEndPending/, "如果结束候选期间人声恢复，取消结束流程并回到 A2 Active，避免把一次自然停顿切成两个会话。"],
+        [/requestFinalize/, "结束判定触发：通常需要 60-120 秒静音叠加地点、日程或上下文结束，也可以由手动、隐私或低电策略触发。"],
+        [/stopConversation/, "停止正式会话录音，但仍要关闭最后一个分片并完成完整性校验。"],
+        [/closeFinalChunk/, "关闭最后一个未满 60 秒的分片，写入实际结束时间和校验信息。"],
+        [/verifyFullTimeline/, "对整段会话做最终时间线校验，输出完整或缺失区间。"],
+        [/timeline_ok/, "完整性通过，缺失区间为空，可以进入 ASR 定稿。虚线表示校验结果返回。"],
+        [/missing_ranges/, "发现缺片或无法恢复的时间段。必须写入会话元数据，后续问答要能看到缺失。"],
+        [/markMissingRanges/, "把缺失区间持久化，防止 ASR 或 LLM 在没有证据的时间段生成看似真实的内容。"],
+        [/notifyConversationEnded/, "通知视觉层会话结束；如果没有手动或强场景触发，视觉应从 L1/L3 回到 L0。"],
+        [/L1\/L3 -> L0/, "视觉层执行降级，关闭自动拍照，保护续航和隐私。"],
+        [/finalizeConversation/, "把最终 manifest、音频分片和缺失区间提交云端，触发完整 ASR 和说话人处理。"],
+        [/runFullASRAndDiarization/, "云端执行高质量转写、说话人分离、标点和时间戳，对实时粗转写进行最终定稿。"],
+        [/saveTranscriptSegmentsWithAudioEvidence/, "保存逐字稿片段，并绑定到音频时间范围，确保每句话都能回放到证据。"],
+        [/indexed/, "文本索引完成，后续可以检索或问答。虚线表示云端内部处理结果返回。"],
+        [/transcript_status = final/, "手机端收到定稿状态。完整会话为 final，存在缺片时为 final_with_gaps，UI 和后续问答都要展示证据完整性。"],
+        [/enter\(A1 listening\) \/ restart preroll/, "会话收尾后音频主状态回到 A1，并重新启动预录环，为下一段会话做准备。"],
+        [/requestProbeWindow/, "从正式录音时间线中取 A2 前 30 秒作为探测窗口，不切断原本 60 秒分片，降低后续代码改动面。"],
+        [/createProbeSegmentRef/, "创建探测片段引用和校验信息，优先复用本地音频数据，避免额外生成一套正式证据文件。"],
+        [/probe_segment_ref/, "返回探测片段引用和 SHA-256。虚线表示本地数据引用，不是新采集。"],
+        [/enqueueHighPriorityProbe/, "把探测片段放入高优先级上传队列，使场景判断比常规批量上传更快返回。"],
+        [/uploadProbeAudioAndManifest/, "上传 30 秒探测音频和最小 manifest，用于快速场景判断。失败不影响正式会话录音。"],
+        [/quickASRAndSceneClassify/, "云端快速转写并做场景分类，只产出粗粒度场景候选，不替代最终 ASR。"],
+        [/scene_candidate/, "返回粗转写、场景类型和置信度，供端侧策略门判断是否允许 L3。"],
+        [/probe_result \/ retry_after \/ timeout/, "探测可能成功、被要求重试或超时。超时不升级视觉，保持 L1 保底。"],
+        [/publishSceneProbeResult/, "把场景探测结果发布回音频状态机，统一进入策略门，不让上传器直接操作视觉状态。"],
+        [/evaluateVisualUpgrade/, "策略门融合场景结果、隐私、电量、温度、预算和冷却，决定是否允许视觉升级。"],
+        [/allowL3\(ttl, reason\) or keepL1/, "策略门只返回允许或拒绝。允许时携带 L3 TTL 和原因；拒绝时继续 L1。"],
+        [/L1 -> L3 scene-burst/, "视觉从 L1 升级为 L3 短 burst，持续时间受 TTL、预算和冷却约束。"],
+        [/L3 -> L1 when ttl\/budget\/cooldown ends/, "L3 到期、预算耗尽或冷却触发后自动降回 L1，避免高频拍照失控。"],
+        [/markProbeUploadedOrRetry/, "记录探测上传状态。成功、失败、重试都独立于常规音频上传状态。"],
+        [/retryOnceOrKeepL1OnFailure/, "探测失败最多轻量重试一次；仍失败时保持 L1，不阻塞会话和常规上传。"],
+        [/cancelProbeIfA2EndedOrA0/, "如果会话已经结束或进入 A0，取消未完成探测，避免隐私状态改变后继续上传。"],
+        [/audio_frame\(source=glasses\)/, "眼镜麦克风作为主音频源持续输出帧，是最接近用户听觉视角的来源。"],
+        [/forward\(frame\)/, "路由器把当前主音频源转发给录音器，录音器不需要关心具体来源。"],
+        [/markSourceSwitchStart/, "记录音频源切换起点，后续时间线和证据要能标出来源变化。"],
+        [/startFallbackMic/, "眼镜链路异常时启动手机麦克风兜底，保证会话不断录。"],
+        [/audio_frame\(source=phone\)/, "手机麦克风开始输出兜底音频帧，音质和位置会不同，必须记录来源。"],
+        [/keepOverlap/, "切换时保留 1-2 秒重叠音频，用于相关性对齐和去重，避免切换点漏字。"],
+        [/alignByCorrelation\(glasses_tail, phone_head\)/, "用眼镜尾部和手机头部重叠音频做相关性对齐，计算时间偏移。"],
+        [/alignByCorrelation\(phone_tail, glasses_head\)/, "眼镜恢复后同样用重叠音频对齐，避免手机源切回眼镜源时产生重复或断点。"],
+        [/aligned_offset_ms/, "连续性检查器返回对齐偏移，录音器据此裁剪重叠并修正时间线。"],
+        [/writeSourceHistory\(glasses -> phone\)/, "记录从眼镜源切到手机源的历史，后续证据定位和质量评估会用到。"],
+        [/resumeAudio/, "眼镜恢复后重新启动眼镜音频源，但仍要经过重叠对齐才能切回主源。"],
+        [/writeSourceHistory\(phone -> glasses\)/, "记录从手机源切回眼镜源的历史，形成完整 source_history。"]
+      ];
+
+      const matched = rules.find(([pattern]) => pattern.test(text));
+      if (matched) return matched[1];
+      return `这一步把 ${step.from} 的状态或数据交给 ${step.to}，用于推进 ${diagram.title} 的音频采集流程。`;
+    }
+
+    function inferFlowImpact(step, diagram) {
+      const text = step.text;
+      if (/A0|recording_allowed = false|clearAndStop|stopAudioCapture|forceLevel|PrivacyGap/.test(text)) {
+        return "影响：进入或维持隐私暂停链路，停止保存原始音频，并约束视觉层关闭。";
+      }
+      if (/A1|startLowPowerAudio|RingBuffer|low_power_audio_frame|detectVoice|appendEncrypted/.test(text)) {
+        return "影响：维持低功耗监听和短预录，不生成正式会话证据。";
+      }
+      if (/A2|Conversation|Preroll|preroll|sequence_no=0|notifyA2Started|startConversation|EndPending|Finalize/.test(text)) {
+        return "影响：建立正式会话时间线，预录、音频分片和视觉 L1 开始共享同一 conversation_id。";
+      }
+      if (/Chunk|chunk|Manifest|manifest|sha256|sequence|Continuity|gap|missing/.test(text)) {
+        return "影响：保证音频分片可校验、可重试、可发现缺失，避免后续模型伪造缺口内容。";
+      }
+      if (/Probe|probe|Scene|scene|VisualUpgrade|allowL3|keepL1|L1 -> L3|L3 -> L1|Classify/.test(text)) {
+        return "影响：推进 30 秒场景探测和视觉升级判断；失败或拒绝时保持 L1，不影响正式录音。";
+      }
+      if (/upload|ack|Uploaded|Ingestion|ASR|Diarization|indexed|transcript_status|retry/.test(text)) {
+        return "影响：把本地证据推进到云端处理和索引阶段，但不影响端侧继续录音。";
+      }
+      if (/source|Fallback|Overlap|align|SourceHistory|resumeAudio/.test(text)) {
+        return "影响：在音频源切换时保留连续性，并在时间线上标明来源变化。";
+      }
+      if (step.dashed) {
+        return "影响：这是状态返回或确认流，不携带新的原始音频。";
+      }
+      return "影响：推进当前音频状态机，不直接改变视觉策略，除非目标模块是 VisualLevelScheduler。";
+    }
+
+    function buildFlowDetail(diagram, step, index) {
+      const from = getModule(step.from);
+      const to = getModule(step.to);
+      return {
+        title: `步骤 ${index + 1}: ${step.text}`,
+        purpose: explainFlow(step, diagram),
+        route: `${step.from}（${from.device}） -> ${step.to}（${to.device}）`,
+        impact: inferFlowImpact(step, diagram),
+        signal: step.dashed ? "线型：虚线，表示返回值、状态确认或非主数据流。" : "线型：实线，表示命令、数据帧或主流程推进。"
+      };
+    }
+
+    function serializeFlowDetail(detail) {
+      return [
+        detail.title,
+        `含义：${detail.purpose}`,
+        `部署：${detail.route}`,
+        detail.impact,
+        detail.signal
+      ].join("\n");
+    }
+
+    function renderFlowTooltip(detail, event) {
+      flowTooltip.innerHTML = `
+        <h3>${escapeXml(detail.title)}</h3>
+        <p><strong>含义：</strong>${escapeXml(detail.purpose)}</p>
+        <p><strong>部署：</strong>${escapeXml(detail.route)}</p>
+        <p><strong>状态/数据：</strong>${escapeXml(detail.impact.replace(/^影响：/, ""))}</p>
+        <p><strong>${escapeXml(detail.signal)}</strong></p>
+      `;
+      flowTooltip.classList.add("visible");
+      flowTooltip.setAttribute("aria-hidden", "false");
+      moveFlowTooltip(event);
+    }
+
+    function renderModuleTooltip(name, event) {
+      const mod = getModule(name);
+      flowTooltip.innerHTML = `
+        <span class="device-tag ${mod.tagClass || ""}">${escapeXml(mod.device)}</span>
+        <h3>${escapeXml(name)}</h3>
+        <p>${escapeXml(mod.desc)}</p>
+      `;
+      flowTooltip.classList.add("visible");
+      flowTooltip.setAttribute("aria-hidden", "false");
+      moveFlowTooltip(event);
+    }
+
+    function moveFlowTooltip(event) {
+      if (!flowTooltip.classList.contains("visible")) return;
+      const offset = 16;
+      const rect = flowTooltip.getBoundingClientRect();
+      let left = event.clientX + offset;
+      let top = event.clientY + offset;
+      if (left + rect.width > window.innerWidth - 10) left = event.clientX - rect.width - offset;
+      if (top + rect.height > window.innerHeight - 10) top = event.clientY - rect.height - offset;
+      flowTooltip.style.left = `${Math.max(10, left)}px`;
+      flowTooltip.style.top = `${Math.max(10, top)}px`;
+    }
+
+    function hideFlowTooltip() {
+      flowTooltip.classList.remove("visible");
+      flowTooltip.setAttribute("aria-hidden", "true");
+    }
+
+    function participantX(index, count, width) {
+      const margin = 112;
+      if (count === 1) return width / 2;
+      return margin + index * ((width - margin * 2) / (count - 1));
+    }
+
+    function wrapText(text, maxChars) {
+      const chunks = [];
+      let line = "";
+      for (const char of String(text)) {
+        const next = line + char;
+        const weight = /[A-Za-z0-9_()/.=-]/.test(char) ? 0.62 : 1;
+        const currentUnits = [...line].reduce((sum, c) => sum + (/[A-Za-z0-9_()/.=-]/.test(c) ? 0.62 : 1), 0);
+        if (currentUnits + weight > maxChars && line) {
+          chunks.push(line);
+          line = char;
+        } else {
+          line = next;
+        }
+      }
+      if (line) chunks.push(line);
+      return chunks.slice(0, 3);
+    }
+
+    function blockBounds(block, rowYs, positions, width) {
+      const startY = rowYs[block.from] - 22;
+      const endY = rowYs[block.to] + 28;
+      return {
+        x: 42,
+        y: startY,
+        width: width - 84,
+        height: Math.max(62, endY - startY)
+      };
+    }
+
+    function renderDiagram() {
+      const diagram = state.currentDiagram;
+      const count = diagram.participants.length;
+      const width = Math.max(1180, count * 168);
+      const top = 94;
+      const rowGap = 56;
+      const height = top + diagram.steps.length * rowGap + 110;
+      state.baseWidth = width;
+      state.baseHeight = height;
+
+      const positions = new Map();
+      diagram.participants.forEach((name, index) => {
+        positions.set(name, participantX(index, count, width));
+      });
+
+      const rowYs = diagram.steps.map((_, index) => top + index * rowGap);
+      const blockParts = (diagram.blocks || []).map(block => {
+        const b = blockBounds(block, rowYs, positions, width);
+        const color = block.kind === "else" ? "#fbf2dc" : block.kind === "alt" ? "#edf3fb" : "#edf7f0";
+        const stroke = block.kind === "else" ? "#d7bc73" : block.kind === "alt" ? "#b8cae6" : "#bdd9c7";
+        return `
+          <rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="8" fill="${color}" stroke="${stroke}" stroke-width="1.2" opacity="0.72"></rect>
+          <rect x="${b.x}" y="${b.y}" width="168" height="28" rx="8" fill="${stroke}" opacity="0.42"></rect>
+          <text x="${b.x + 12}" y="${b.y + 19}" font-size="13" font-weight="700" fill="#26362f">${escapeXml(block.kind.toUpperCase())}: ${escapeXml(block.label)}</text>
+        `;
+      }).join("");
+
+      const participantParts = diagram.participants.map(name => {
+        const x = positions.get(name);
+        const mod = getModule(name);
+        const color = deviceColors[mod.device] || (mod.tagClass === "cloud" ? "#946716" : mod.tagClass === "glasses" ? "#146b4c" : "#2e5f9f");
+        const labelLines = wrapText(name, 16);
+        const lineY = labelLines.length === 1 ? 50 : 41;
+        const text = labelLines.map((line, idx) => `<text x="${x}" y="${lineY + idx * 16}" text-anchor="middle" font-size="13" font-weight="700" fill="#17211d">${escapeXml(line)}</text>`).join("");
+        return `
+          <g class="participant" data-module="${escapeXml(name)}" role="button" aria-label="${escapeXml(name)}">
+            <rect x="${x - 74}" y="20" width="148" height="50" rx="8" fill="#ffffff" stroke="${color}" stroke-width="1.6"></rect>
+            <circle cx="${x - 60}" cy="36" r="5" fill="${color}"></circle>
+            ${text}
+            <line x1="${x}" y1="70" x2="${x}" y2="${height - 46}" stroke="#cad5d0" stroke-width="1.3" stroke-dasharray="6 7"></line>
+          </g>
+        `;
+      }).join("");
+
+      const stepParts = diagram.steps.map((step, index) => {
+        const y = rowYs[index];
+        const fromX = positions.get(step.from);
+        const toX = positions.get(step.to);
+        const stepNo = index + 1;
+        const detail = buildFlowDetail(diagram, step, index);
+        const detailText = serializeFlowDetail(detail);
+        if (fromX === toX) {
+          const boxW = 120;
+          const path = `
+            M ${fromX} ${y}
+            C ${fromX + 62} ${y}, ${fromX + 62} ${y + 34}, ${fromX} ${y + 34}
+          `;
+          const lines = wrapText(step.text, 24);
+          return `
+            <g class="message" data-module="${escapeXml(step.from)}" data-step-index="${index}">
+              <title>${escapeXml(detailText)}</title>
+              <rect x="${fromX - 10}" y="${y - 28}" width="248" height="82" fill="transparent" stroke="none"></rect>
+              <text x="54" y="${y + 5}" font-size="12" fill="#62716a">${stepNo}</text>
+              <path d="${path}" fill="none" stroke="#36463f" stroke-width="1.7" marker-end="url(#arrow)"></path>
+              ${lines.map((line, idx) => `<text x="${fromX + boxW / 2 + 8}" y="${y + 7 + idx * 15}" font-size="12" fill="#17211d">${escapeXml(line)}</text>`).join("")}
+            </g>
+          `;
+        }
+        const minX = Math.min(fromX, toX);
+        const maxX = Math.max(fromX, toX);
+        const direction = toX > fromX ? 1 : -1;
+        const labelX = (fromX + toX) / 2;
+        const labelLines = wrapText(step.text, Math.max(16, Math.floor((maxX - minX) / 9)));
+        const dash = step.dashed ? 'stroke-dasharray="7 6"' : "";
+        const arrow = direction > 0 ? "url(#arrow)" : "url(#arrowLeft)";
+        const hitY = y - 44 - Math.max(0, labelLines.length - 1) * 14;
+        const hitHeight = 62 + Math.max(0, labelLines.length - 1) * 14;
+        return `
+          <g class="message" data-module="${escapeXml(step.from)}" data-step-index="${index}">
+            <title>${escapeXml(detailText)}</title>
+            <rect x="${minX - 12}" y="${hitY}" width="${maxX - minX + 24}" height="${hitHeight}" fill="transparent" stroke="none"></rect>
+            <text x="54" y="${y + 5}" font-size="12" fill="#62716a">${stepNo}</text>
+            <line x1="${fromX}" y1="${y}" x2="${toX}" y2="${y}" stroke="#36463f" stroke-width="1.7" ${dash} marker-end="${arrow}"></line>
+            ${labelLines.map((line, idx) => `<text x="${labelX}" y="${y - 9 - (labelLines.length - 1 - idx) * 14}" text-anchor="middle" font-size="12" fill="#17211d">${escapeXml(line)}</text>`).join("")}
+          </g>
+        `;
+      }).join("");
+
+      svgWrap.innerHTML = `
+        <svg id="sequenceSvg" xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="svgTitle svgDesc">
+          <title id="svgTitle">${escapeXml(diagram.title)}</title>
+          <desc id="svgDesc">${escapeXml(diagram.subtitle)}</desc>
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L9,3 L0,6 Z" fill="#36463f"></path>
+            </marker>
+            <marker id="arrowLeft" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M9,0 L0,3 L9,6 Z" fill="#36463f"></path>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"></rect>
+          ${blockParts}
+          ${participantParts}
+          ${stepParts}
+        </svg>
+      `;
+
+      svgWrap.querySelectorAll(".participant[data-module]").forEach(node => {
+        node.style.cursor = "help";
+        node.addEventListener("pointerdown", event => {
+          event.stopPropagation();
+        });
+        node.addEventListener("mouseenter", event => {
+          const name = node.getAttribute("data-module");
+          renderModuleTooltip(name, event);
+        });
+        node.addEventListener("mousemove", moveFlowTooltip);
+        node.addEventListener("mouseleave", hideFlowTooltip);
+      });
+
+      svgWrap.querySelectorAll(".message[data-step-index]").forEach(node => {
+        node.style.cursor = "help";
+        node.addEventListener("mouseenter", event => {
+          const stepIndex = Number(node.getAttribute("data-step-index"));
+          const step = state.currentDiagram.steps[stepIndex];
+          renderFlowTooltip(buildFlowDetail(state.currentDiagram, step, stepIndex), event);
+        });
+        node.addEventListener("mousemove", moveFlowTooltip);
+        node.addEventListener("mouseleave", hideFlowTooltip);
+      });
+
+      updateZoom();
+    }
+
+    function renderSelectors() {
+      diagramList.innerHTML = "";
+      diagrams.forEach(diagram => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "diagram-tab";
+        button.setAttribute("aria-pressed", diagram.id === state.currentDiagram.id ? "true" : "false");
+        button.innerHTML = `${diagram.title}<span>${diagram.subtitle}</span>`;
+        button.addEventListener("click", () => {
+          hideFlowTooltip();
+          state.currentDiagram = diagram;
+          diagramTitle.textContent = diagram.title;
+          diagramSubtitle.textContent = diagram.subtitle;
+          renderSelectors();
+          renderNotes();
+          renderDiagram();
+          fitToWidth();
+        });
+        diagramList.appendChild(button);
+      });
+    }
+
+    function renderNotes() {
+      reviewNotes.innerHTML = "";
+      state.currentDiagram.notes.forEach(note => {
+        const li = document.createElement("li");
+        li.textContent = note;
+        reviewNotes.appendChild(li);
+      });
+    }
+
+    function updateZoom() {
+      const zoom = state.zoom;
+      svgWrap.style.transform = `scale(${zoom})`;
+      svgWrap.style.width = `${state.baseWidth * zoom + 56}px`;
+      svgWrap.style.height = `${state.baseHeight * zoom + 56}px`;
+      zoomRange.value = Math.round(zoom * 100);
+      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+    }
+
+    function setZoom(percent) {
+      const oldZoom = state.zoom;
+      const next = Math.max(0.55, Math.min(1.8, percent / 100));
+      const centerX = viewport.scrollLeft + viewport.clientWidth / 2;
+      const centerY = viewport.scrollTop + viewport.clientHeight / 2;
+      const ratio = next / oldZoom;
+      state.zoom = next;
+      updateZoom();
+      viewport.scrollLeft = centerX * ratio - viewport.clientWidth / 2;
+      viewport.scrollTop = centerY * ratio - viewport.clientHeight / 2;
+    }
+
+    function fitToWidth() {
+      const available = viewport.clientWidth - 42;
+      const fit = Math.max(0.55, Math.min(1.25, available / state.baseWidth));
+      state.zoom = fit;
+      updateZoom();
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
+    }
+
+    document.getElementById("zoomOut").addEventListener("click", () => setZoom(Math.round(state.zoom * 100) - 10));
+    document.getElementById("zoomIn").addEventListener("click", () => setZoom(Math.round(state.zoom * 100) + 10));
+    document.getElementById("fitBtn").addEventListener("click", fitToWidth);
+    zoomRange.addEventListener("input", event => setZoom(Number(event.target.value)));
+
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    viewport.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      if (event.target.closest("[data-module]")) return;
+      isDragging = true;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      startLeft = viewport.scrollLeft;
+      startTop = viewport.scrollTop;
+      viewport.classList.add("dragging");
+      viewport.setPointerCapture(event.pointerId);
+    });
+
+    viewport.addEventListener("pointermove", event => {
+      if (!isDragging) return;
+      viewport.scrollLeft = startLeft - (event.clientX - dragStartX);
+      viewport.scrollTop = startTop - (event.clientY - dragStartY);
+    });
+
+    viewport.addEventListener("pointerup", event => {
+      if (!isDragging) return;
+      isDragging = false;
+      viewport.classList.remove("dragging");
+      viewport.releasePointerCapture(event.pointerId);
+    });
+
+    viewport.addEventListener("wheel", event => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      const delta = event.deltaY > 0 ? -8 : 8;
+      setZoom(Math.round(state.zoom * 100) + delta);
+    }, {passive: false});
+
+    viewport.addEventListener("scroll", hideFlowTooltip);
+
+    window.addEventListener("resize", () => {
+      hideFlowTooltip();
+      updateZoom();
+    });
+
+    renderSelectors();
+    renderNotes();
+    renderDiagram();
+    requestAnimationFrame(fitToWidth);
+  </script>
+</body>
+</html>

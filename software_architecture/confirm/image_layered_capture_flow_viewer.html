@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>图像分层采集 UML 时序图审核器</title>
+  <style>
+    :root {
+      --bg: #f6f7f5;
+      --surface: #ffffff;
+      --surface-2: #eef3f1;
+      --ink: #17211d;
+      --muted: #62716a;
+      --line: #d7e0dc;
+      --green: #146b4c;
+      --blue: #2e5f9f;
+      --amber: #946716;
+      --red: #9f3f31;
+      --violet: #6e579f;
+      --shadow: 0 18px 46px rgba(22, 33, 29, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, rgba(20, 107, 76, 0.08), transparent 340px),
+        var(--bg);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .shell {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+
+    .title-block p {
+      margin: 5px 0 0;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      background: var(--green);
+    }
+
+    .dot.phone {
+      background: var(--blue);
+    }
+
+    .dot.cloud {
+      background: var(--amber);
+    }
+
+    .dot.policy {
+      background: var(--violet);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 372px;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .diagram-panel,
+    .side-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .diagram-panel {
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .diagram-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfb;
+    }
+
+    .current h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .current p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 6px;
+      min-height: 30px;
+      padding: 4px 9px;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: var(--surface-2);
+    }
+
+    .btn.primary {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+
+    .zoom-label {
+      min-width: 50px;
+      text-align: right;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .range {
+      width: 130px;
+      accent-color: var(--green);
+    }
+
+    .viewport {
+      height: calc(100vh - 146px);
+      min-height: 560px;
+      overflow: auto;
+      cursor: grab;
+      background:
+        linear-gradient(90deg, rgba(216, 224, 220, 0.38) 1px, transparent 1px),
+        linear-gradient(rgba(216, 224, 220, 0.38) 1px, transparent 1px),
+        #fbfcfb;
+      background-size: 28px 28px;
+    }
+
+    .viewport.dragging {
+      cursor: grabbing;
+      user-select: none;
+    }
+
+    .svg-wrap {
+      transform-origin: 0 0;
+      padding: 28px;
+    }
+
+    svg {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .side-panel {
+      min-height: calc(100vh - 88px);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .selector {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfb;
+    }
+
+    .selector h2,
+    .notes h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.25;
+    }
+
+    .diagram-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .diagram-tab {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      padding: 9px 10px;
+      cursor: pointer;
+    }
+
+    .diagram-tab[aria-pressed="true"] {
+      border-color: var(--green);
+      background: #eaf5ee;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .diagram-tab span {
+      display: block;
+      color: var(--muted);
+      font-weight: 400;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .notes {
+      padding: 14px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    .note-list,
+    .constraint-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .note-list li,
+    .constraint-list li {
+      margin: 6px 0;
+    }
+
+    .constraint-box {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .flow-tooltip {
+      position: fixed;
+      z-index: 20;
+      width: min(380px, calc(100vw - 28px));
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 16px 42px rgba(22, 33, 29, 0.18);
+      color: var(--ink);
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(10px, 10px);
+      transition: opacity 120ms ease;
+    }
+
+    .flow-tooltip.visible {
+      opacity: 1;
+    }
+
+    .flow-tooltip h3 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--green);
+    }
+
+    .flow-tooltip p {
+      margin: 6px 0;
+      color: var(--muted);
+    }
+
+    .flow-tooltip strong {
+      color: var(--ink);
+    }
+
+    .device-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--green);
+    }
+
+    .device-tag.phone {
+      background: var(--blue);
+    }
+
+    .device-tag.cloud {
+      background: var(--amber);
+    }
+
+    .device-tag.policy {
+      background: var(--violet);
+    }
+
+    .device-tag.store {
+      background: #566a5f;
+    }
+
+    .device-tag.user {
+      background: var(--muted);
+    }
+
+    @media (max-width: 1060px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        min-height: auto;
+      }
+
+      .viewport {
+        height: 620px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        padding: 12px;
+      }
+
+      .topbar,
+      .diagram-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .legend,
+      .zoom-controls {
+        justify-content: flex-start;
+      }
+
+      .range {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="title-block">
+        <h1>图像分层采集 UML 时序图审核器</h1>
+        <p>对齐已确认的 L0/L1/L3 策略：音频托底触发视觉，眼镜只采集缓存，手机负责状态与策略，云端做 OCR 和索引。</p>
+      </div>
+      <div class="legend" aria-label="部署设备图例">
+        <span class="badge"><span class="dot"></span>眼镜端</span>
+        <span class="badge"><span class="dot phone"></span>手机端</span>
+        <span class="badge"><span class="dot cloud"></span>云端</span>
+        <span class="badge"><span class="dot policy"></span>策略门</span>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <section class="diagram-panel" aria-label="缩放时序图">
+        <div class="diagram-toolbar">
+          <div class="current">
+            <h2 id="diagramTitle">L0 Off 默认关闭与隐私强制</h2>
+            <p id="diagramSubtitle">视觉默认关闭，A0 或禁拍策略命中时强制停止自动拍照并关闭未完成任务。</p>
+          </div>
+          <div class="zoom-controls" aria-label="缩放控制">
+            <button class="btn" id="zoomOut" type="button" title="缩小">-</button>
+            <input class="range" id="zoomRange" type="range" min="55" max="180" value="100" aria-label="缩放比例">
+            <button class="btn" id="zoomIn" type="button" title="放大">+</button>
+            <button class="btn primary" id="fitBtn" type="button">适配</button>
+            <span class="zoom-label" id="zoomLabel">100%</span>
+          </div>
+        </div>
+        <div class="viewport" id="viewport">
+          <div class="svg-wrap" id="svgWrap"></div>
+        </div>
+        <div class="flow-tooltip" id="flowTooltip" role="tooltip" aria-hidden="true"></div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="selector">
+          <h2>选择图像层级图</h2>
+          <div class="diagram-list" id="diagramList"></div>
+        </section>
+
+        <section class="notes">
+          <h2>当前图审核点</h2>
+          <ul class="note-list" id="reviewNotes"></ul>
+          <div class="constraint-box">
+            <h2>全局闭环约束</h2>
+            <ul class="constraint-list">
+              <li>A0 强制 L0；A2 才允许自动 L1；L3 只能从 L1 经策略门升级。</li>
+              <li>LLM 或规则只输出建议，不能直接控制相机。</li>
+              <li>所有图片必须先写文件再写 manifest，ACK 前不能删除。</li>
+              <li>低电、过热、缓存高水位、手机失联都要有降级路径。</li>
+              <li>云端 OCR 结果必须回溯到 conversation_id、图片坐标和音频时间。</li>
+            </ul>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const modules = {
+      "用户": {
+        device: "用户",
+        tagClass: "user",
+        desc: "手动暂停、恢复或授权采集。用户动作优先级最高，可以立即切断自动视觉采集。"
+      },
+      "手机 App": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "用户入口和状态展示层。负责展示当前视觉等级、降级原因、隐私暂停和上传状态。"
+      },
+      "AudioSessionManager": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "音频状态机主控。A2 started 是 L1 自动视觉保底的唯一默认入口。"
+      },
+      "LowLatencyTranscriptProvider": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "低延迟粗转写或关键词提供方，给视觉触发器提供最近 10-20 秒的语义窗口。"
+      },
+      "VisualLevelScheduler": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "图像层级状态机。管理 L0/L1/L3、拍照节拍、TTL、冷却和退出条件。"
+      },
+      "VisualTriggerLLM": {
+        device: "手机端或云端",
+        tagClass: "phone",
+        desc: "视觉触发判断器。输入最近转写、L1 图像线索和上下文，只输出结构化建议。"
+      },
+      "PhoneImageHintExtractor": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "轻量图像线索提取器。只做低成本 has_text、surface_type、blur、fingerprint 等提示，不承担最终 OCR。"
+      },
+      "CapturePolicyGate": {
+        device: "策略门",
+        tagClass: "policy",
+        desc: "确定性策略门。融合隐私、电量、温度、预算、冷却、缓存和网络状态，批准或拒绝层级变化。"
+      },
+      "PrivacyPolicyGate": {
+        device: "策略门",
+        tagClass: "policy",
+        desc: "隐私策略门。敏感地点、隐私日程、用户暂停和企业策略都在这里统一裁决。"
+      },
+      "PowerThermalMonitor": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "电量和温度遥测。给策略门提供 L3 限流、降级和恢复判断所需的硬约束。"
+      },
+      "NetworkLinkMonitor": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "链路和缓存水位监控。识别手机失联、P2P 不可用、缓存接近上限等情况。"
+      },
+      "GlassCaptureAgent": {
+        device: "眼镜端",
+        tagClass: "glasses",
+        desc: "眼镜端采集执行器。只执行手机下发的拍照、切层级、批量发送、ACK 清理等确定性命令。"
+      },
+      "Glass Camera": {
+        device: "眼镜端",
+        tagClass: "glasses",
+        desc: "静态拍照相机。首版不做连续视频，只按 L1/L3 节拍拍静态图。"
+      },
+      "StatusIndicator": {
+        device: "眼镜端",
+        tagClass: "glasses",
+        desc: "录音/拍照状态提示。用于隐私合规，让佩戴者和周围人知道当前视觉采集状态。"
+      },
+      "ImageQualityGuard": {
+        device: "眼镜端或手机端",
+        tagClass: "glasses",
+        desc: "轻量质量标注。标记模糊、曝光异常、重复画面和指纹稳定，不在端侧删除证据。"
+      },
+      "LocalVisualCache": {
+        device: "眼镜端",
+        tagClass: "store",
+        desc: "眼镜本地图片缓存。弱网或手机失联时继续保存，直到手机确认 ACK 后才删除。"
+      },
+      "LocalManifestStore": {
+        device: "眼镜端",
+        tagClass: "store",
+        desc: "眼镜本地 manifest。记录 capture_id、conversation_id、visual_level、sequence_no、时间戳、sha256 和 ACK 状态。"
+      },
+      "BatchTransferManager": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "批量回传管理器。按 15-60 分钟、会话结束、低电或缓存高水位建立 P2P 并接收文件。"
+      },
+      "EncryptedMediaStore": {
+        device: "手机端",
+        tagClass: "store",
+        desc: "手机加密媒体库。保存图片、manifest、上传状态、质量标签和后续 OCR 元数据。"
+      },
+      "Uploader": {
+        device: "手机端",
+        tagClass: "phone",
+        desc: "后台上传队列。弱网幂等重试，成功后更新手机端上传状态。"
+      },
+      "IngestionService": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "云端接入服务。校验 manifest 和图片文件，按 conversation_id 创建处理任务。"
+      },
+      "ConversationPipeline": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "完整 ASR 和会话时间线。为图像 OCR 提供音频时间、段落和语义上下文。"
+      },
+      "TextImagePipeline": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "图像文本化管线。负责 OCR、版面恢复、去重、白板/屏幕/纸面场景处理和证据坐标输出。"
+      },
+      "OCRQualityGate": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "OCR 质量门。标注低置信度、缺失区域、重复帧和需要用户复核的图片。"
+      },
+      "TextMemoryIndex": {
+        device: "云端",
+        tagClass: "cloud",
+        desc: "文本记忆索引。把 OCR 文本、图像坐标、音频时间和原始证据关联起来，支持检索和回溯。"
+      }
+    };
+
+    const diagrams = [
+      {
+        id: "l0-off",
+        title: "L0 Off 默认关闭与隐私强制",
+        subtitle: "视觉默认关闭，A0 或禁拍策略命中时强制停止自动拍照并关闭未完成任务。",
+        notes: [
+          "L0 是视觉默认状态，不因为佩戴或 A1 监听自动拍照。",
+          "A0、敏感地点、隐私日程和用户暂停必须立即强制 L0。",
+          "进入 L0 时要取消 L1/L3 定时器，关闭相机，并把未完成 burst 以隐私/策略事件收尾。",
+          "恢复后只回到 A1/L0；必须等 A2 started 后才允许自动 L1。"
+        ],
+        participants: ["用户", "手机 App", "PrivacyPolicyGate", "AudioSessionManager", "VisualLevelScheduler", "CapturePolicyGate", "GlassCaptureAgent", "Glass Camera", "LocalVisualCache", "StatusIndicator"],
+        blocks: [
+          {kind: "alt", from: 0, to: 9, label: "A0 或禁拍策略命中"},
+          {kind: "else", from: 10, to: 13, label: "用户恢复后"}
+        ],
+        steps: [
+          {from: "用户", to: "手机 App", text: "点击暂停 / 敏感地点 / 隐私日程命中"},
+          {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluateVisualPrivacyContext()"},
+          {from: "PrivacyPolicyGate", to: "手机 App", text: "visual_allowed = false", dashed: true},
+          {from: "手机 App", to: "AudioSessionManager", text: "enter(A0 private)"},
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "forceLevel(L0 off)"},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "revokeVisualCommands(reason=privacy)"},
+          {from: "CapturePolicyGate", to: "GlassCaptureAgent", text: "stopAutoPhoto()"},
+          {from: "GlassCaptureAgent", to: "Glass Camera", text: "powerDownCamera()"},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "sealOpenCaptureAsPolicyGap()"},
+          {from: "VisualLevelScheduler", to: "StatusIndicator", text: "showVisualOff()"},
+          {from: "用户", to: "手机 App", text: "恢复记录"},
+          {from: "手机 App", to: "PrivacyPolicyGate", text: "evaluateVisualPrivacyContext()"},
+          {from: "PrivacyPolicyGate", to: "手机 App", text: "visual_allowed = true", dashed: true},
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "stay(L0) until A2 started"}
+        ]
+      },
+      {
+        id: "l1-scout",
+        title: "A2 -> L1 Voice-Scout 保底采样",
+        subtitle: "会话开始后进入每分钟一张的低/中分辨率静态图采集，图片只缓存不即时上传。",
+        notes: [
+          "L1 的唯一默认自动入口是 A2 started，避免 A1 低功耗监听阶段采集图像。",
+          "每次拍照前都重新经过策略门，低电、过热或禁拍时可以跳过本次 tick。",
+          "图片文件和 visual_manifest.jsonl 必须同事务写入，保证后续批量回传可校验。",
+          "L1 只提供文本载体保底和触发线索，不做端侧完整 OCR。"
+        ],
+        participants: ["AudioSessionManager", "VisualLevelScheduler", "CapturePolicyGate", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "LocalVisualCache", "LocalManifestStore"],
+        blocks: [
+          {kind: "alt", from: 1, to: 5, label: "策略门允许 L1"},
+          {kind: "loop", from: 6, to: 14, label: "A2 期间每 60 秒调度一次"}
+        ],
+        steps: [
+          {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "notifyA2Started(conversation_id)"},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "requestLevel(L1, interval=60s)"},
+          {from: "CapturePolicyGate", to: "PowerThermalMonitor", text: "readBatteryThermal()"},
+          {from: "PowerThermalMonitor", to: "CapturePolicyGate", text: "battery_percent + thermal", dashed: true},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL1 or keepL0(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "setVisualLevel(L1 voice-scout)"},
+          {from: "GlassCaptureAgent", to: "StatusIndicator", text: "cuePhotoMode(L1)"},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "takePhoto(res=low_mid, reason=l1_tick)"},
+          {from: "GlassCaptureAgent", to: "Glass Camera", text: "captureStill()"},
+          {from: "Glass Camera", to: "GlassCaptureAgent", text: "jpg + sensor_metadata", dashed: true},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeImageFile(capture_id.jpg)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendVisualManifest(level=L1, sequence_no)"},
+          {from: "LocalManifestStore", to: "VisualLevelScheduler", text: "captureResult(capture_id, next_at)", dashed: true},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "recheckBeforeNextTick()"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "continue or skipReason", dashed: true}
+        ]
+      },
+      {
+        id: "l1-trigger-input",
+        title: "L1 图像线索与语义触发输入",
+        subtitle: "把最近 L1 图片线索和最近 10-20 秒转写合成结构化触发输入，LLM 只输出建议。",
+        notes: [
+          "L1 图片可以产生轻量 image_hint，但不要在手机端做重 OCR。",
+          "触发输入必须包含 audio_state、recent_transcript、recent_l1_image_hint、预算和隐私状态。",
+          "VisualTriggerLLM 的输出是 should_trigger_l3、scene_type、confidence、ttl_seconds、reason_code。",
+          "无论模型是否建议升级，最终都必须由 CapturePolicyGate 给出 allow/deny 闭环结果。"
+        ],
+        participants: ["VisualLevelScheduler", "LocalVisualCache", "PhoneImageHintExtractor", "LowLatencyTranscriptProvider", "VisualTriggerLLM", "CapturePolicyGate", "LocalManifestStore"],
+        blocks: [
+          {kind: "loop", from: 0, to: 5, label: "A2/L1 期间滚动构造触发输入"},
+          {kind: "alt", from: 6, to: 10, label: "LLM 建议升级或保持 L1"}
+        ],
+        steps: [
+          {from: "VisualLevelScheduler", to: "LocalVisualCache", text: "readLatestL1Thumbnail(conversation_id)"},
+          {from: "LocalVisualCache", to: "PhoneImageHintExtractor", text: "downsampled_image", dashed: true},
+          {from: "PhoneImageHintExtractor", to: "PhoneImageHintExtractor", text: "detectTextSurfaceBlurFingerprint()"},
+          {from: "LowLatencyTranscriptProvider", to: "VisualTriggerLLM", text: "recent_transcript_window(10-20s)"},
+          {from: "PhoneImageHintExtractor", to: "VisualTriggerLLM", text: "recent_l1_image_hint(has_text, surface_type, blur)"},
+          {from: "VisualLevelScheduler", to: "VisualTriggerLLM", text: "audio_state + visual_state + budget_context"},
+          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "structuredDecision(should_trigger_l3, ttl, reason)"},
+          {from: "CapturePolicyGate", to: "CapturePolicyGate", text: "evaluate privacy/power/budget/cooldown"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl) or keepL1(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendTriggerDecisionEvent(reason, confidence)"},
+          {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "scheduleNextDecisionWindow()"}
+        ]
+      },
+      {
+        id: "l3-burst",
+        title: "L3 Scene-Burst 高频文本场景",
+        subtitle: "文本场景命中后短时每秒一张，TTL、预算、冷却或画面稳定后自动降回 L1。",
+        notes: [
+          "L3 是短 burst，不是连续视频；默认 10-30 秒，最大时长由远程配置约束。",
+          "每张 L3 图必须携带 trigger_reason、ttl、sequence_no、quality_tag 和 visual_level。",
+          "质量守卫只打标签，不擅自删除原始证据；真正的 OCR 质量判断在云端完成。",
+          "L3 到期、预算耗尽、温度升高、画面指纹稳定或会话结束，都要降回 L1 或 L0。"
+        ],
+        participants: ["VisualTriggerLLM", "CapturePolicyGate", "VisualLevelScheduler", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "ImageQualityGuard", "LocalVisualCache", "LocalManifestStore"],
+        blocks: [
+          {kind: "alt", from: 0, to: 5, label: "策略门批准 L3"},
+          {kind: "loop", from: 6, to: 14, label: "TTL 内每 1 秒拍 1 张"},
+          {kind: "else", from: 15, to: 16, label: "退出条件命中"}
+        ],
+        steps: [
+          {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "should_trigger_l3=true, reason=screen_or_paper_text"},
+          {from: "CapturePolicyGate", to: "PowerThermalMonitor", text: "readLiveLimits()"},
+          {from: "PowerThermalMonitor", to: "CapturePolicyGate", text: "battery + thermal + l3_budget_left", dashed: true},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl=20s, budget_token)"},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "setVisualLevel(L3 scene-burst, fps=1)"},
+          {from: "GlassCaptureAgent", to: "StatusIndicator", text: "showBurstActive()"},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "takePhoto(sequence_no, res=ocr_ready)"},
+          {from: "GlassCaptureAgent", to: "Glass Camera", text: "captureStill()"},
+          {from: "Glass Camera", to: "GlassCaptureAgent", text: "jpg + exposure_metadata", dashed: true},
+          {from: "GlassCaptureAgent", to: "ImageQualityGuard", text: "quickCheck(blur/exposure/fingerprint)"},
+          {from: "ImageQualityGuard", to: "GlassCaptureAgent", text: "quality_tag", dashed: true},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeImageFile(capture_id.jpg)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendVisualManifest(level=L3, trigger_reason)"},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "consumeBudget(1s)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "continue or downgrade(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "setVisualLevel(L1 voice-scout)"},
+          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendLevelExit(ttl/budget/cooldown)"}
+        ]
+      },
+      {
+        id: "batch-transfer",
+        title: "视觉 Manifest 与延迟批量回传",
+        subtitle: "眼镜端延迟缓存图片和 manifest，手机按窗口批量拉取，ACK 后眼镜才清理。",
+        notes: [
+          "L1/L3 都不为单张图片即时唤醒高速链路，降低无线尾能耗。",
+          "manifest 先传，文件按 capture_id 拉取，手机校验 sha256 后才 ACK。",
+          "眼镜只删除已 ACK 文件，上传云端失败不影响眼镜端 ACK 清理。",
+          "弱网、P2P 中断或手机失联时，从 last_ack_cursor 后继续补传。"
+        ],
+        participants: ["BatchTransferManager", "GlassCaptureAgent", "LocalManifestStore", "LocalVisualCache", "EncryptedMediaStore", "Uploader", "IngestionService"],
+        blocks: [
+          {kind: "loop", from: 5, to: 10, label: "每个 pending image 文件"},
+          {kind: "alt", from: 11, to: 15, label: "上传成功或失败重试"}
+        ],
+        steps: [
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "BLE sendBatchRequest(batch_window)"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "establishP2P()"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listPendingVisualManifest(last_ack_cursor)"},
+          {from: "LocalManifestStore", to: "BatchTransferManager", text: "visual_manifest.jsonl", dashed: true},
+          {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "beginTransaction(manifest)"},
+          {from: "BatchTransferManager", to: "LocalVisualCache", text: "requestFile(capture_id)"},
+          {from: "LocalVisualCache", to: "BatchTransferManager", text: "image bytes", dashed: true},
+          {from: "BatchTransferManager", to: "EncryptedMediaStore", text: "verifyShaAndWrite(file)"},
+          {from: "EncryptedMediaStore", to: "GlassCaptureAgent", text: "ACK(capture_id)", dashed: true},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "markAcked(capture_id)"},
+          {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "deleteAckedFile(capture_id)"},
+          {from: "EncryptedMediaStore", to: "Uploader", text: "enqueueUpload(manifest + files)"},
+          {from: "Uploader", to: "IngestionService", text: "upload visual package"},
+          {from: "IngestionService", to: "Uploader", text: "ingestion_ack", dashed: true},
+          {from: "Uploader", to: "EncryptedMediaStore", text: "markUploaded()"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "keepUnackedForRetry()", dashed: true}
+        ]
+      },
+      {
+        id: "cloud-ocr",
+        title: "云端 OCR/版面恢复与索引",
+        subtitle: "云端把 L1/L3 图片与会话音频时间线对齐，输出可回溯的文本记忆证据。",
+        notes: [
+          "OCR 不是独立图片识别任务，要按 conversation_id 对齐音频时间线和语义上下文。",
+          "L1 用于低频保底和定位场景，L3 用于补足文字细节。",
+          "低质量、遮挡、重复和疑似缺失区域要显式标注，不能让索引假装完整。",
+          "最终索引需要保留图片坐标、capture_id、audio timestamp 和处理版本。"
+        ],
+        participants: ["IngestionService", "TextImagePipeline", "ConversationPipeline", "OCRQualityGate", "TextMemoryIndex", "手机 App"],
+        blocks: [
+          {kind: "loop", from: 3, to: 7, label: "按会话与时间窗口处理图片序列"}
+        ],
+        steps: [
+          {from: "IngestionService", to: "TextImagePipeline", text: "createVisualJob(conversation_id)"},
+          {from: "IngestionService", to: "ConversationPipeline", text: "fetchAudioTimeline(conversation_id)"},
+          {from: "ConversationPipeline", to: "TextImagePipeline", text: "transcript_segments + timestamps", dashed: true},
+          {from: "TextImagePipeline", to: "TextImagePipeline", text: "groupFramesByLevelAndTime()"},
+          {from: "TextImagePipeline", to: "TextImagePipeline", text: "runOCRAndLayoutRecovery()"},
+          {from: "TextImagePipeline", to: "OCRQualityGate", text: "evaluate blur/coverage/confidence"},
+          {from: "OCRQualityGate", to: "TextImagePipeline", text: "quality_tags + missing_regions", dashed: true},
+          {from: "TextImagePipeline", to: "TextImagePipeline", text: "dedupeStableFrames()"},
+          {from: "TextImagePipeline", to: "TextMemoryIndex", text: "writeEvidence(text, image_coord, audio_time)"},
+          {from: "TextMemoryIndex", to: "手机 App", text: "searchReady / lowQualityHints", dashed: true}
+        ]
+      },
+      {
+        id: "degrade-recover",
+        title: "异常降级与恢复闭环",
+        subtitle: "低电、过热、缓存高水位或链路异常时降级，恢复后从 ACK 游标继续补传和采集。",
+        notes: [
+          "降级是策略结果，不是设备异常自由发挥：L3 可降 L1，L1 可降 L0。",
+          "任何降级都要写 manifest 事件，方便后续解释缺图区间。",
+          "手机失联时眼镜继续缓存，但缓存高水位可以进一步降级到 L0。",
+          "恢复后从 last_ack_cursor 补传，不能重新编号或覆盖旧 capture_id。"
+        ],
+        participants: ["PowerThermalMonitor", "NetworkLinkMonitor", "CapturePolicyGate", "VisualLevelScheduler", "GlassCaptureAgent", "Glass Camera", "LocalManifestStore", "BatchTransferManager", "手机 App"],
+        blocks: [
+          {kind: "alt", from: 0, to: 6, label: "降级条件命中"},
+          {kind: "loop", from: 7, to: 12, label: "恢复后补传并按下一 tick 恢复层级"}
+        ],
+        steps: [
+          {from: "PowerThermalMonitor", to: "CapturePolicyGate", text: "battery_low / thermal_high"},
+          {from: "NetworkLinkMonitor", to: "CapturePolicyGate", text: "phone_disconnected / cache_near_full"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "recomputeMaxAllowedLevel()"},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "downgrade(L3->L1 or L1->L0)"},
+          {from: "GlassCaptureAgent", to: "Glass Camera", text: "stopBurstOrPowerDown()"},
+          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendDegradeEvent(reason, level_before, level_after)"},
+          {from: "VisualLevelScheduler", to: "手机 App", text: "showDegradedReason()", dashed: true},
+          {from: "NetworkLinkMonitor", to: "BatchTransferManager", text: "reconnectDetected()"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "requestPendingFromLastAck()"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "listAfterAckCursor()"},
+          {from: "BatchTransferManager", to: "GlassCaptureAgent", text: "resumeBatchTransfer()"},
+          {from: "BatchTransferManager", to: "CapturePolicyGate", text: "reportCacheRecovered()"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "restoreAllowedLevelOnNextTick()", dashed: true}
+        ]
+      }
+    ];
+
+    const deviceColors = {
+      "眼镜端": "#146b4c",
+      "手机端": "#2e5f9f",
+      "云端": "#946716",
+      "策略门": "#6e579f",
+      "用户": "#62716a"
+    };
+
+    const state = {
+      currentDiagram: diagrams[0],
+      zoom: 1,
+      baseWidth: 1180,
+      baseHeight: 720
+    };
+
+    const diagramList = document.getElementById("diagramList");
+    const reviewNotes = document.getElementById("reviewNotes");
+    const diagramTitle = document.getElementById("diagramTitle");
+    const diagramSubtitle = document.getElementById("diagramSubtitle");
+    const svgWrap = document.getElementById("svgWrap");
+    const viewport = document.getElementById("viewport");
+    const zoomRange = document.getElementById("zoomRange");
+    const zoomLabel = document.getElementById("zoomLabel");
+    const flowTooltip = document.getElementById("flowTooltip");
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function getModule(name) {
+      return modules[name] || {
+        device: "未归类",
+        tagClass: "",
+        desc: "该模块尚未登记说明，请在设计评审后补充职责边界。"
+      };
+    }
+
+    function explainFlow(step, diagram) {
+      const text = step.text;
+      const rules = [
+        [/forceLevel\(L0|stopAutoPhoto|powerDownCamera|visual_allowed = false/, "关闭自动视觉采集，确保隐私和策略状态立即生效。"],
+        [/notifyA2Started|requestLevel\(L1|setVisualLevel\(L1/, "从正式会话进入 L1 保底视觉采样，为文本载体留下低频证据。"],
+        [/takePhoto|captureStill|writeImageFile|appendVisualManifest/, "完成一次静态图采集，并把文件与 manifest 绑定成可校验证据。"],
+        [/recent_transcript|recent_l1_image_hint|structuredDecision/, "构造视觉升级判断所需的语义和图像线索。"],
+        [/allowL3|setVisualLevel\(L3|consumeBudget|downgrade/, "推进 L3 短 burst，并持续受 TTL、预算、温度和冷却约束。"],
+        [/sendBatchRequest|establishP2P|ACK|deleteAckedFile|keepUnacked/, "执行延迟批量回传，保证 ACK 前不丢失眼镜端文件。"],
+        [/runOCR|Layout|Quality|writeEvidence|TextMemoryIndex/, "把图片序列转成可检索文本，并保留质量标签和证据坐标。"],
+        [/battery_low|thermal_high|cache_near_full|recomputeMaxAllowedLevel|restoreAllowedLevel/, "处理异常降级和恢复，保证每个状态变化都有可解释原因。"]
+      ];
+      const matched = rules.find(([pattern]) => pattern.test(text));
+      if (matched) return matched[1];
+      return `这一步把 ${step.from} 的状态或数据交给 ${step.to}，用于推进 ${diagram.title}。`;
+    }
+
+    function inferFlowImpact(step) {
+      const text = step.text;
+      if (/L0|privacy|visual_allowed = false|stopAutoPhoto|powerDown/.test(text)) {
+        return "影响：进入或维持视觉关闭链路，停止自动拍照并取消未完成任务。";
+      }
+      if (/L1|l1_tick|voice-scout|interval=60s/.test(text)) {
+        return "影响：建立低频保底采样节奏，不触发即时上传。";
+      }
+      if (/Trigger|structuredDecision|confidence|recent_l1_image_hint|recent_transcript/.test(text)) {
+        return "影响：生成 L3 候选判断，但相机控制权仍在策略门和调度器手里。";
+      }
+      if (/L3|burst|ttl|budget|consumeBudget|fingerprint/.test(text)) {
+        return "影响：进入高价值文本场景短 burst，并准备按退出条件降级。";
+      }
+      if (/Manifest|manifest|capture_id|sequence_no|sha|ACK|ack|deleteAcked/.test(text)) {
+        return "影响：维护图片证据链、顺序和清理边界，方便断点续传与审计。";
+      }
+      if (/OCR|Layout|quality|missing|Evidence|Index|searchReady/.test(text)) {
+        return "影响：把图像内容文本化，并标记质量风险与可回溯证据位置。";
+      }
+      if (/battery|thermal|cache|reconnect|restore|degrade|downgrade/.test(text)) {
+        return "影响：根据硬约束降级或恢复，避免功耗、热和缓存风险扩散。";
+      }
+      if (step.dashed) {
+        return "影响：这是返回值、状态确认或非主数据流，不直接发起新的拍照。";
+      }
+      return "影响：推进当前图像层级状态机，并保持由手机端统一调度。";
+    }
+
+    function buildFlowDetail(diagram, step, index) {
+      const from = getModule(step.from);
+      const to = getModule(step.to);
+      return {
+        title: `步骤 ${index + 1}: ${step.text}`,
+        purpose: explainFlow(step, diagram),
+        route: `${step.from}（${from.device}） -> ${step.to}（${to.device}）`,
+        impact: inferFlowImpact(step),
+        signal: step.dashed ? "线型：虚线，表示返回值、状态确认或非主数据流。" : "线型：实线，表示命令、数据帧或主流程推进。"
+      };
+    }
+
+    function renderFlowTooltip(detail, event) {
+      flowTooltip.innerHTML = `
+        <h3>${escapeHtml(detail.title)}</h3>
+        <p><strong>含义：</strong>${escapeHtml(detail.purpose)}</p>
+        <p><strong>部署：</strong>${escapeHtml(detail.route)}</p>
+        <p><strong>状态/数据：</strong>${escapeHtml(detail.impact.replace(/^影响：/, ""))}</p>
+        <p><strong>${escapeHtml(detail.signal)}</strong></p>
+      `;
+      flowTooltip.classList.add("visible");
+      flowTooltip.setAttribute("aria-hidden", "false");
+      moveFlowTooltip(event);
+    }
+
+    function renderModuleTooltip(name, event) {
+      const mod = getModule(name);
+      flowTooltip.innerHTML = `
+        <span class="device-tag ${mod.tagClass || ""}">${escapeHtml(mod.device)}</span>
+        <h3>${escapeHtml(name)}</h3>
+        <p>${escapeHtml(mod.desc)}</p>
+      `;
+      flowTooltip.classList.add("visible");
+      flowTooltip.setAttribute("aria-hidden", "false");
+      moveFlowTooltip(event);
+    }
+
+    function moveFlowTooltip(event) {
+      if (!flowTooltip.classList.contains("visible")) return;
+      const offset = 16;
+      const rect = flowTooltip.getBoundingClientRect();
+      let left = event.clientX + offset;
+      let top = event.clientY + offset;
+      if (left + rect.width > window.innerWidth - 10) left = event.clientX - rect.width - offset;
+      if (top + rect.height > window.innerHeight - 10) top = event.clientY - rect.height - offset;
+      flowTooltip.style.left = `${Math.max(10, left)}px`;
+      flowTooltip.style.top = `${Math.max(10, top)}px`;
+    }
+
+    function hideFlowTooltip() {
+      flowTooltip.classList.remove("visible");
+      flowTooltip.setAttribute("aria-hidden", "true");
+    }
+
+    function participantX(index, count, width) {
+      const margin = 112;
+      if (count === 1) return width / 2;
+      return margin + index * ((width - margin * 2) / (count - 1));
+    }
+
+    function visualWidth(text) {
+      return [...String(text)].reduce((sum, char) => sum + (/[A-Za-z0-9_()/.=:\->]/.test(char) ? 0.62 : 1), 0);
+    }
+
+    function wrapText(text, maxChars) {
+      const chunks = [];
+      let line = "";
+      for (const char of String(text)) {
+        const next = line + char;
+        if (visualWidth(next) > maxChars && line) {
+          chunks.push(line);
+          line = char;
+        } else {
+          line = next;
+        }
+      }
+      if (line) chunks.push(line);
+      return chunks.slice(0, 3);
+    }
+
+    function blockBounds(block, rowYs, width) {
+      const startIndex = Math.max(0, Math.min(rowYs.length - 1, block.from));
+      const endIndex = Math.max(0, Math.min(rowYs.length - 1, block.to));
+      const startY = rowYs[startIndex] - 22;
+      const endY = rowYs[endIndex] + 28;
+      return {
+        x: 42,
+        y: startY,
+        width: width - 84,
+        height: Math.max(62, endY - startY)
+      };
+    }
+
+    function renderDiagram() {
+      const diagram = state.currentDiagram;
+      const count = diagram.participants.length;
+      const width = Math.max(1200, count * 170);
+      const top = 94;
+      const rowGap = 58;
+      const height = top + diagram.steps.length * rowGap + 112;
+      state.baseWidth = width;
+      state.baseHeight = height;
+
+      const positions = new Map();
+      diagram.participants.forEach((name, index) => {
+        positions.set(name, participantX(index, count, width));
+      });
+
+      const rowYs = diagram.steps.map((_, index) => top + index * rowGap);
+      const blockParts = (diagram.blocks || []).map(block => {
+        const b = blockBounds(block, rowYs, width);
+        const color = block.kind === "else" ? "#fbf2dc" : block.kind === "alt" ? "#edf3fb" : "#edf7f0";
+        const stroke = block.kind === "else" ? "#d7bc73" : block.kind === "alt" ? "#b8cae6" : "#bdd9c7";
+        return `
+          <rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="8" fill="${color}" stroke="${stroke}" stroke-width="1.2" opacity="0.72"></rect>
+          <rect x="${b.x}" y="${b.y}" width="190" height="28" rx="8" fill="${stroke}" opacity="0.42"></rect>
+          <text x="${b.x + 12}" y="${b.y + 19}" font-size="13" font-weight="700" fill="#26362f">${escapeHtml(block.kind.toUpperCase())}: ${escapeHtml(block.label)}</text>
+        `;
+      }).join("");
+
+      const participantParts = diagram.participants.map(name => {
+        const x = positions.get(name);
+        const mod = getModule(name);
+        const color = deviceColors[mod.device] || "#566a5f";
+        const labelLines = wrapText(name, 16);
+        const lineY = labelLines.length === 1 ? 50 : 41;
+        const text = labelLines.map((line, idx) => `<text x="${x}" y="${lineY + idx * 16}" text-anchor="middle" font-size="13" font-weight="700" fill="#17211d">${escapeHtml(line)}</text>`).join("");
+        return `
+          <g class="participant" data-module="${escapeHtml(name)}" role="button" aria-label="${escapeHtml(name)}">
+            <rect x="${x - 74}" y="20" width="148" height="50" rx="8" fill="#ffffff" stroke="${color}" stroke-width="1.6"></rect>
+            <circle cx="${x - 60}" cy="36" r="5" fill="${color}"></circle>
+            ${text}
+            <line x1="${x}" y1="70" x2="${x}" y2="${height - 46}" stroke="#cad5d0" stroke-width="1.3" stroke-dasharray="6 7"></line>
+          </g>
+        `;
+      }).join("");
+
+      const stepParts = diagram.steps.map((step, index) => {
+        const y = rowYs[index];
+        const fromX = positions.get(step.from);
+        const toX = positions.get(step.to);
+        const stepNo = index + 1;
+        const detail = buildFlowDetail(diagram, step, index);
+        const detailText = [
+          detail.title,
+          `含义：${detail.purpose}`,
+          `部署：${detail.route}`,
+          detail.impact,
+          detail.signal
+        ].join("\n");
+
+        if (fromX === toX) {
+          const path = `
+            M ${fromX} ${y}
+            C ${fromX + 62} ${y}, ${fromX + 62} ${y + 34}, ${fromX} ${y + 34}
+          `;
+          const lines = wrapText(step.text, 25);
+          return `
+            <g class="message" data-step-index="${index}">
+              <title>${escapeHtml(detailText)}</title>
+              <rect x="${fromX - 10}" y="${y - 28}" width="254" height="84" fill="transparent" stroke="none"></rect>
+              <text x="54" y="${y + 5}" font-size="12" fill="#62716a">${stepNo}</text>
+              <path d="${path}" fill="none" stroke="#36463f" stroke-width="1.7" marker-end="url(#arrow)"></path>
+              ${lines.map((line, idx) => `<text x="${fromX + 70}" y="${y + 7 + idx * 15}" font-size="12" fill="#17211d">${escapeHtml(line)}</text>`).join("")}
+            </g>
+          `;
+        }
+
+        const minX = Math.min(fromX, toX);
+        const maxX = Math.max(fromX, toX);
+        const direction = toX > fromX ? 1 : -1;
+        const labelX = (fromX + toX) / 2;
+        const labelLines = wrapText(step.text, Math.max(16, Math.floor((maxX - minX) / 9)));
+        const dash = step.dashed ? 'stroke-dasharray="7 6"' : "";
+        const arrow = direction > 0 ? "url(#arrow)" : "url(#arrowLeft)";
+        const hitY = y - 44 - Math.max(0, labelLines.length - 1) * 14;
+        const hitHeight = 62 + Math.max(0, labelLines.length - 1) * 14;
+        return `
+          <g class="message" data-step-index="${index}">
+            <title>${escapeHtml(detailText)}</title>
+            <rect x="${minX - 12}" y="${hitY}" width="${maxX - minX + 24}" height="${hitHeight}" fill="transparent" stroke="none"></rect>
+            <text x="54" y="${y + 5}" font-size="12" fill="#62716a">${stepNo}</text>
+            <line x1="${fromX}" y1="${y}" x2="${toX}" y2="${y}" stroke="#36463f" stroke-width="1.7" ${dash} marker-end="${arrow}"></line>
+            ${labelLines.map((line, idx) => `<text x="${labelX}" y="${y - 9 - (labelLines.length - 1 - idx) * 14}" text-anchor="middle" font-size="12" fill="#17211d">${escapeHtml(line)}</text>`).join("")}
+          </g>
+        `;
+      }).join("");
+
+      svgWrap.innerHTML = `
+        <svg id="sequenceSvg" xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="svgTitle svgDesc">
+          <title id="svgTitle">${escapeHtml(diagram.title)}</title>
+          <desc id="svgDesc">${escapeHtml(diagram.subtitle)}</desc>
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L9,3 L0,6 Z" fill="#36463f"></path>
+            </marker>
+            <marker id="arrowLeft" markerWidth="10" markerHeight="10" refX="1" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M9,0 L0,3 L9,6 Z" fill="#36463f"></path>
+            </marker>
+          </defs>
+          <rect x="0" y="0" width="${width}" height="${height}" fill="#ffffff"></rect>
+          ${blockParts}
+          ${participantParts}
+          ${stepParts}
+        </svg>
+      `;
+
+      svgWrap.querySelectorAll(".participant[data-module]").forEach(node => {
+        node.style.cursor = "help";
+        node.addEventListener("pointerdown", event => {
+          event.stopPropagation();
+        });
+        node.addEventListener("mouseenter", event => {
+          renderModuleTooltip(node.getAttribute("data-module"), event);
+        });
+        node.addEventListener("mousemove", moveFlowTooltip);
+        node.addEventListener("mouseleave", hideFlowTooltip);
+      });
+
+      svgWrap.querySelectorAll(".message[data-step-index]").forEach(node => {
+        node.style.cursor = "help";
+        node.addEventListener("mouseenter", event => {
+          const stepIndex = Number(node.getAttribute("data-step-index"));
+          const step = state.currentDiagram.steps[stepIndex];
+          renderFlowTooltip(buildFlowDetail(state.currentDiagram, step, stepIndex), event);
+        });
+        node.addEventListener("mousemove", moveFlowTooltip);
+        node.addEventListener("mouseleave", hideFlowTooltip);
+      });
+
+      updateZoom();
+    }
+
+    function renderSelectors() {
+      diagramList.innerHTML = "";
+      diagrams.forEach(diagram => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "diagram-tab";
+        button.setAttribute("aria-pressed", diagram.id === state.currentDiagram.id ? "true" : "false");
+        button.innerHTML = `${escapeHtml(diagram.title)}<span>${escapeHtml(diagram.subtitle)}</span>`;
+        button.addEventListener("click", () => {
+          hideFlowTooltip();
+          state.currentDiagram = diagram;
+          diagramTitle.textContent = diagram.title;
+          diagramSubtitle.textContent = diagram.subtitle;
+          renderSelectors();
+          renderNotes();
+          renderDiagram();
+          fitToWidth();
+        });
+        diagramList.appendChild(button);
+      });
+    }
+
+    function renderNotes() {
+      reviewNotes.innerHTML = "";
+      state.currentDiagram.notes.forEach(note => {
+        const li = document.createElement("li");
+        li.textContent = note;
+        reviewNotes.appendChild(li);
+      });
+    }
+
+    function updateZoom() {
+      const zoom = state.zoom;
+      svgWrap.style.transform = `scale(${zoom})`;
+      svgWrap.style.width = `${state.baseWidth * zoom + 56}px`;
+      svgWrap.style.height = `${state.baseHeight * zoom + 56}px`;
+      zoomRange.value = Math.round(zoom * 100);
+      zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+    }
+
+    function setZoom(percent) {
+      const oldZoom = state.zoom;
+      const next = Math.max(0.55, Math.min(1.8, percent / 100));
+      const centerX = viewport.scrollLeft + viewport.clientWidth / 2;
+      const centerY = viewport.scrollTop + viewport.clientHeight / 2;
+      const ratio = next / oldZoom;
+      state.zoom = next;
+      updateZoom();
+      viewport.scrollLeft = centerX * ratio - viewport.clientWidth / 2;
+      viewport.scrollTop = centerY * ratio - viewport.clientHeight / 2;
+    }
+
+    function fitToWidth() {
+      const available = viewport.clientWidth - 42;
+      const fit = Math.max(0.55, Math.min(1.25, available / state.baseWidth));
+      state.zoom = fit;
+      updateZoom();
+      viewport.scrollLeft = 0;
+      viewport.scrollTop = 0;
+    }
+
+    document.getElementById("zoomOut").addEventListener("click", () => setZoom(Math.round(state.zoom * 100) - 10));
+    document.getElementById("zoomIn").addEventListener("click", () => setZoom(Math.round(state.zoom * 100) + 10));
+    document.getElementById("fitBtn").addEventListener("click", fitToWidth);
+    zoomRange.addEventListener("input", event => setZoom(Number(event.target.value)));
+
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    viewport.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      if (event.target.closest("[data-module]")) return;
+      isDragging = true;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      startLeft = viewport.scrollLeft;
+      startTop = viewport.scrollTop;
+      viewport.classList.add("dragging");
+      viewport.setPointerCapture(event.pointerId);
+    });
+
+    viewport.addEventListener("pointermove", event => {
+      if (!isDragging) return;
+      viewport.scrollLeft = startLeft - (event.clientX - dragStartX);
+      viewport.scrollTop = startTop - (event.clientY - dragStartY);
+    });
+
+    viewport.addEventListener("pointerup", event => {
+      if (!isDragging) return;
+      isDragging = false;
+      viewport.classList.remove("dragging");
+      viewport.releasePointerCapture(event.pointerId);
+    });
+
+    viewport.addEventListener("wheel", event => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      const delta = event.deltaY > 0 ? -8 : 8;
+      setZoom(Math.round(state.zoom * 100) + delta);
+    }, {passive: false});
+
+    viewport.addEventListener("scroll", hideFlowTooltip);
+
+    window.addEventListener("resize", () => {
+      hideFlowTooltip();
+      updateZoom();
+    });
+
+    renderSelectors();
+    renderNotes();
+    renderDiagram();
+    requestAnimationFrame(fitToWidth);
+  </script>
+</body>
+</html>
