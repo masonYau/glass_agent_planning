@@ -448,6 +448,7 @@
             <h2>全局闭环约束</h2>
             <ul class="constraint-list">
               <li>A0 强制 L0；A2 才允许自动 L1；L3 只能从 L1 经策略门升级。</li>
+              <li>手机端下发层级策略、拍照节拍和租约；眼镜端在租约内本地定时拍照。</li>
               <li>LLM 或规则只输出建议，不能直接控制相机。</li>
               <li>所有图片必须先写文件再写 manifest，ACK 前不能删除。</li>
               <li>低电、过热、缓存高水位、手机失联都要有降级路径。</li>
@@ -484,7 +485,7 @@
       "VisualLevelScheduler": {
         device: "手机端",
         tagClass: "phone",
-        desc: "图像层级状态机。管理 L0/L1/L3、拍照节拍、TTL、冷却和退出条件。"
+        desc: "图像层级状态机。管理 L0/L1/L3、TTL、冷却和退出条件；向眼镜下发 schedule、burst 和 lease，不逐张发 takePhoto。"
       },
       "VisualTriggerLLM": {
         device: "手机端或云端",
@@ -519,7 +520,7 @@
       "GlassCaptureAgent": {
         device: "眼镜端",
         tagClass: "glasses",
-        desc: "眼镜端采集执行器。只执行手机下发的拍照、切层级、批量发送、ACK 清理等确定性命令。"
+        desc: "眼镜端采集执行器。安装手机下发的 L1/L3 策略和租约，在租约内用本地 timer 拍照，并执行批量发送、ACK 清理和自动降级。"
       },
       "Glass Camera": {
         device: "眼镜端",
@@ -624,34 +625,38 @@
       {
         id: "l1-scout",
         title: "A2 -> L1 Voice-Scout 保底采样",
-        subtitle: "会话开始后进入每分钟一张的低/中分辨率静态图采集，图片只缓存不即时上传。",
+        subtitle: "会话开始后手机下发 L1 schedule 和租约，眼镜端本地每分钟拍一张并延迟回传。",
         notes: [
           "L1 的唯一默认自动入口是 A2 started，避免 A1 低功耗监听阶段采集图像。",
-          "每次拍照前都重新经过策略门，低电、过热或禁拍时可以跳过本次 tick。",
+          "手机端只在进入、续租、撤销或降级时经过策略门，不为每张 L1 图片单独下发 takePhoto。",
+          "眼镜端每次本地 tick 前检查 lease、缓存水位和本地硬约束；lease 过期或撤销后自动降 L0。",
           "图片文件和 visual_manifest.jsonl 必须同事务写入，保证后续批量回传可校验。",
           "L1 只提供文本载体保底和触发线索，不做端侧完整 OCR。"
         ],
         participants: ["AudioSessionManager", "VisualLevelScheduler", "CapturePolicyGate", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "LocalVisualCache", "LocalManifestStore"],
         blocks: [
-          {kind: "alt", from: 1, to: 5, label: "策略门允许 L1"},
-          {kind: "loop", from: 6, to: 14, label: "A2 期间每 60 秒调度一次"}
+          {kind: "alt", from: 1, to: 6, label: "策略门允许 L1 并签发租约"},
+          {kind: "loop", from: 8, to: 12, label: "眼镜端租约内每 60 秒本地拍照"},
+          {kind: "loop", from: 13, to: 16, label: "手机端按策略续租或撤销"}
         ],
         steps: [
           {from: "AudioSessionManager", to: "VisualLevelScheduler", text: "notifyA2Started(conversation_id)"},
-          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "requestLevel(L1, interval=60s)"},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "requestLevel(L1, interval=60s, lease_ttl=300s)"},
           {from: "CapturePolicyGate", to: "PowerThermalMonitor", text: "readBatteryThermal()"},
           {from: "PowerThermalMonitor", to: "CapturePolicyGate", text: "battery_percent + thermal", dashed: true},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL1 or keepL0(reason)", dashed: true},
-          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "setVisualLevel(L1 voice-scout)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL1(lease_ttl) or keepL0(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "installL1Schedule(conversation_id, interval=60s, lease_ttl=300s, res=low_mid)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendLevelEnter(level=L1, lease_expire_at)"},
           {from: "GlassCaptureAgent", to: "StatusIndicator", text: "cuePhotoMode(L1)"},
-          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "takePhoto(res=low_mid, reason=l1_tick)"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "localTimerTickIfLeaseValid(reason=l1_tick)"},
           {from: "GlassCaptureAgent", to: "Glass Camera", text: "captureStill()"},
           {from: "Glass Camera", to: "GlassCaptureAgent", text: "jpg + sensor_metadata", dashed: true},
           {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeImageFile(capture_id.jpg)"},
           {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendVisualManifest(level=L1, sequence_no)"},
-          {from: "LocalManifestStore", to: "VisualLevelScheduler", text: "captureResult(capture_id, next_at)", dashed: true},
-          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "recheckBeforeNextTick()"},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "continue or skipReason", dashed: true}
+          {from: "GlassCaptureAgent", to: "VisualLevelScheduler", text: "heartbeat(level=L1, last_capture_id, lease_left)", dashed: true},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "renewOrRevokeLeaseOnPolicyTick()"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "renewLease or revoke/downgrade(reason)", dashed: true},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "renewLease(ttl=300s) / revokeVisualLevel()"}
         ]
       },
       {
@@ -678,7 +683,7 @@
           {from: "VisualLevelScheduler", to: "VisualTriggerLLM", text: "audio_state + visual_state + budget_context"},
           {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "structuredDecision(should_trigger_l3, ttl, reason)"},
           {from: "CapturePolicyGate", to: "CapturePolicyGate", text: "evaluate privacy/power/budget/cooldown"},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl) or keepL1(reason)", dashed: true},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl, burst_expire_at) or keepL1(reason)", dashed: true},
           {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendTriggerDecisionEvent(reason, confidence)"},
           {from: "VisualLevelScheduler", to: "VisualLevelScheduler", text: "scheduleNextDecisionWindow()"}
         ]
@@ -686,37 +691,47 @@
       {
         id: "l3-burst",
         title: "L3 Scene-Burst 高频文本场景",
-        subtitle: "文本场景命中后短时每秒一张，TTL、预算、冷却或画面稳定后自动降回 L1。",
+        subtitle: "文本场景命中后手机下发 L3 burst 参数，眼镜端在 TTL 内本地每秒拍一张并自动回 L1。",
         notes: [
           "L3 是短 burst，不是连续视频；默认 10-30 秒，最大时长由远程配置约束。",
+          "手机端不逐秒发 takePhoto，而是一次性下发 fps、ttl、reason_code、budget_token 和短租约。",
+          "L3 必须带过期策略：burst_expire_at = start_at + min(trigger_ttl, policy_max_ttl, remaining_budget)。",
+          "burst 租约续租只维持控制链路，不延长 burst_expire_at；到期后必须退出 L3。",
           "每张 L3 图必须携带 trigger_reason、ttl、sequence_no、quality_tag 和 visual_level。",
           "质量守卫只打标签，不擅自删除原始证据；真正的 OCR 质量判断在云端完成。",
-          "L3 到期、预算耗尽、温度升高、画面指纹稳定或会话结束，都要降回 L1 或 L0。"
+          "L3 到期优先回 L1；如果 L1 lease 无效、A2 已结束、隐私禁拍或硬约束触发，则直接回 L0。"
         ],
         participants: ["VisualTriggerLLM", "CapturePolicyGate", "VisualLevelScheduler", "PowerThermalMonitor", "GlassCaptureAgent", "StatusIndicator", "Glass Camera", "ImageQualityGuard", "LocalVisualCache", "LocalManifestStore"],
         blocks: [
-          {kind: "alt", from: 0, to: 5, label: "策略门批准 L3"},
-          {kind: "loop", from: 6, to: 14, label: "TTL 内每 1 秒拍 1 张"},
-          {kind: "else", from: 15, to: 16, label: "退出条件命中"}
+          {kind: "alt", from: 0, to: 7, label: "策略门批准 L3 并签发过期时间与 burst 租约"},
+          {kind: "loop", from: 8, to: 18, label: "眼镜端未过期且租约有效时每 1 秒本地拍照"},
+          {kind: "else", from: 19, to: 23, label: "过期、撤销或本地中止后回落"}
         ],
         steps: [
           {from: "VisualTriggerLLM", to: "CapturePolicyGate", text: "should_trigger_l3=true, reason=screen_or_paper_text"},
           {from: "CapturePolicyGate", to: "PowerThermalMonitor", text: "readLiveLimits()"},
           {from: "PowerThermalMonitor", to: "CapturePolicyGate", text: "battery + thermal + l3_budget_left", dashed: true},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl=20s, budget_token)"},
-          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "setVisualLevel(L3 scene-burst, fps=1)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "allowL3(ttl=20s, burst_expire_at, budget_token, lease_ttl=25s)"},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "startBurst(level=L3, fps=1, burst_expire_at, lease_ttl=25s, fallback=L1, reason_code)"},
           {from: "GlassCaptureAgent", to: "StatusIndicator", text: "showBurstActive()"},
-          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "takePhoto(sequence_no, res=ocr_ready)"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendLevelEnter(level=L3, burst_expire_at, budget_token)"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "scheduleLocalExpiryTimer(burst_expire_at, fallback=L1)"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "checkBurstExpiryAndLocalAbort(expire_at, lease, battery, thermal, cache)"},
           {from: "GlassCaptureAgent", to: "Glass Camera", text: "captureStill()"},
           {from: "Glass Camera", to: "GlassCaptureAgent", text: "jpg + exposure_metadata", dashed: true},
           {from: "GlassCaptureAgent", to: "ImageQualityGuard", text: "quickCheck(blur/exposure/fingerprint)"},
           {from: "ImageQualityGuard", to: "GlassCaptureAgent", text: "quality_tag", dashed: true},
           {from: "GlassCaptureAgent", to: "LocalVisualCache", text: "writeImageFile(capture_id.jpg)"},
           {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendVisualManifest(level=L3, trigger_reason)"},
-          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "consumeBudget(1s)"},
-          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "continue or downgrade(reason)", dashed: true},
-          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "setVisualLevel(L1 voice-scout)"},
-          {from: "VisualLevelScheduler", to: "LocalManifestStore", text: "appendLevelExit(ttl/budget/cooldown)"}
+          {from: "GlassCaptureAgent", to: "VisualLevelScheduler", text: "burstHeartbeat(sequence_no, remaining_ttl, burst_expire_at)", dashed: true},
+          {from: "VisualLevelScheduler", to: "CapturePolicyGate", text: "consumeBudgetAndRecheck(heartbeat)"},
+          {from: "CapturePolicyGate", to: "VisualLevelScheduler", text: "continue / renewBurstLease(no_extend_expiry) / revokeToL1", dashed: true},
+          {from: "VisualLevelScheduler", to: "GlassCaptureAgent", text: "renewBurstLease() / revokeToL1()"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "burstExpiredOrLeaseRevokedOrLocalAbort()"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "chooseExpiredFallback(L1 if l1_lease_valid else L0)"},
+          {from: "GlassCaptureAgent", to: "StatusIndicator", text: "cuePhotoMode(L1) or showVisualOff()"},
+          {from: "GlassCaptureAgent", to: "LocalManifestStore", text: "appendLevelExit(expired/budget/cooldown/local_abort, level_after)"},
+          {from: "GlassCaptureAgent", to: "GlassCaptureAgent", text: "returnToInstalledL1Schedule() / forceLevel(L0)"}
         ]
       },
       {
@@ -860,10 +875,10 @@
       const text = step.text;
       const rules = [
         [/forceLevel\(L0|stopAutoPhoto|powerDownCamera|visual_allowed = false/, "关闭自动视觉采集，确保隐私和策略状态立即生效。"],
-        [/notifyA2Started|requestLevel\(L1|setVisualLevel\(L1/, "从正式会话进入 L1 保底视觉采样，为文本载体留下低频证据。"],
-        [/takePhoto|captureStill|writeImageFile|appendVisualManifest/, "完成一次静态图采集，并把文件与 manifest 绑定成可校验证据。"],
+        [/notifyA2Started|requestLevel\(L1|installL1Schedule|renewLease/, "从正式会话进入 L1 保底视觉采样，并把节拍与租约安装到眼镜端。"],
+        [/localTimerTickIfLeaseValid|burstTimerTickIfTtlAndLeaseValid|captureStill|writeImageFile|appendVisualManifest/, "眼镜端在有效租约内本地执行一次静态图采集，并把文件与 manifest 绑定成可校验证据。"],
         [/recent_transcript|recent_l1_image_hint|structuredDecision/, "构造视觉升级判断所需的语义和图像线索。"],
-        [/allowL3|setVisualLevel\(L3|consumeBudget|downgrade/, "推进 L3 短 burst，并持续受 TTL、预算、温度和冷却约束。"],
+        [/allowL3|startBurst|burst_expire_at|consumeBudget|downgrade|revokeToL1|returnToInstalledL1Schedule/, "推进 L3 短 burst，并持续受过期时间、租约、预算、温度和冷却约束。"],
         [/sendBatchRequest|establishP2P|ACK|deleteAckedFile|keepUnacked/, "执行延迟批量回传，保证 ACK 前不丢失眼镜端文件。"],
         [/runOCR|Layout|Quality|writeEvidence|TextMemoryIndex/, "把图片序列转成可检索文本，并保留质量标签和证据坐标。"],
         [/battery_low|thermal_high|cache_near_full|recomputeMaxAllowedLevel|restoreAllowedLevel/, "处理异常降级和恢复，保证每个状态变化都有可解释原因。"]
@@ -878,14 +893,14 @@
       if (/L0|privacy|visual_allowed = false|stopAutoPhoto|powerDown/.test(text)) {
         return "影响：进入或维持视觉关闭链路，停止自动拍照并取消未完成任务。";
       }
-      if (/L1|l1_tick|voice-scout|interval=60s/.test(text)) {
-        return "影响：建立低频保底采样节奏，不触发即时上传。";
+      if (/L1|l1_tick|voice-scout|interval=60s|installL1Schedule|renewLease/.test(text)) {
+        return "影响：手机端授权 L1 节拍和租约，眼镜端在租约内本地低频采样，不触发即时上传。";
       }
       if (/Trigger|structuredDecision|confidence|recent_l1_image_hint|recent_transcript/.test(text)) {
         return "影响：生成 L3 候选判断，但相机控制权仍在策略门和调度器手里。";
       }
-      if (/L3|burst|ttl|budget|consumeBudget|fingerprint/.test(text)) {
-        return "影响：进入高价值文本场景短 burst，并准备按退出条件降级。";
+      if (/L3|burst|ttl|burst_expire_at|expire_at|budget|consumeBudget|fingerprint|lease_ttl|revokeToL1/.test(text)) {
+        return "影响：进入高价值文本场景短 burst；眼镜端按明确过期点本地执行，手机端通过租约和预算控制边界。";
       }
       if (/Manifest|manifest|capture_id|sequence_no|sha|ACK|ack|deleteAcked/.test(text)) {
         return "影响：维护图片证据链、顺序和清理边界，方便断点续传与审计。";
